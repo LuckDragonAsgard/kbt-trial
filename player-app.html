@@ -406,7 +406,44 @@
             background: #000000;
             gap: 3rem;
             padding: 2rem;
+            position: relative;
         }
+
+        .landing-nav {
+            position: absolute;
+            top: 1rem;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+        }
+        .landing-nav a {
+            color: rgba(255,255,255,0.4);
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .landing-nav a:hover { color: #2C94C2; }
+
+        .trial-banner-player {
+            background: rgba(44,148,194,0.1);
+            border-bottom: 1px solid rgba(44,148,194,0.2);
+            padding: 6px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 11px;
+            color: #718096;
+        }
+        .trial-banner-player a {
+            color: #2C94C2;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .trial-banner-player a:hover { text-decoration: underline; }
 
         .landing-logo {
             text-align: center;
@@ -1356,6 +1393,10 @@
 </head>
 <body>
     <div id="landingScreen" class="landing">
+        <div class="landing-nav">
+            <a href="/">← Home</a>
+            <a href="https://knowbrainertrivia.com.au" target="_blank">View live site ↗</a>
+        </div>
         <div class="landing-logo">
             <div class="logo" style="font-size: 4rem; color: #2C94C2; font-family: 'VVDS Fifties', sans-serif; font-weight: 700;">KNOW BRAINER</div>
             <div class="logo" style="font-size: 1.5rem; color: #ffffff; font-style: italic; font-family: 'VVDS Fifties', sans-serif; font-weight: 700; margin-bottom: 0;">Trivia.</div>
@@ -1392,6 +1433,10 @@
                 </div>
             </div>
             <div class="user-badge" id="userBadge"></div>
+        </div>
+        <div class="trial-banner-player">
+            <span>Trial Build</span>
+            <a href="https://knowbrainertrivia.com.au" target="_blank">View live site ↗</a>
         </div>
 
         <div class="content-area" id="contentArea"></div>
