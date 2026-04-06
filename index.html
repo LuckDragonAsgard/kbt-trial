@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KBT Trial - Know Brainer Trivia</title>
+    <style>
+        @font-face {
+            font-family: "VVDS Fifties";
+            src: url("https://knowbrainertrivia.com.au/fonts/VVDSFifties-SExpBold.woff2") format("woff2");
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #000000;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .logo {
+            font-family: "VVDS Fifties", sans-serif;
+            font-size: 4rem;
+            color: #2C94C2;
+            text-align: center;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+        .trivia {
+            font-family: "VVDS Fifties", sans-serif;
+            font-size: 2rem;
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        .tagline {
+            font-family: "VVDS Fifties", sans-serif;
+            font-size: 1.2rem;
+            color: #ffffff;
+            font-style: italic;
+            margin-bottom: 3rem;
+            opacity: 0.8;
+        }
+        .badge {
+            background: #2C94C2;
+            color: white;
+            padding: 0.3rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 2rem;
+        }
+        .links {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            width: 100%;
+            max-width: 400px;
+        }
+        a {
+            display: block;
+            background: #2C94C2;
+            color: #ffffff;
+            text-decoration: none;
+            padding: 1.2rem 2rem;
+            border-radius: 9999px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            transition: opacity 0.2s;
+        }
+        a:hover { opacity: 0.85; }
+        a.outline {
+            background: transparent;
+            border: 2px solid #ffffff;
+        }
+        .footer {
+            margin-top: 3rem;
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo">KNOW BRAINER</div>
+    <div class="trivia">Trivia.</div>
+    <div class="tagline">Trivia. But Better.</div>
+    <div class="badge">Trial Build</div>
+    <div class="links">
+        <a href="/player-app.html">Player Portal</a>
+        <a href="/host-app.html">Host Portal</a>
+        <a href="/admin-app.html" class="outline">Admin Portal</a>
+    </div>
+    <div class="footer">KBT Trial Build — Not connected to live data</div>
+</body>
+</html>
