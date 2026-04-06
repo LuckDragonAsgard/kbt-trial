@@ -109,6 +109,53 @@
             border-left-color: #2C94C2;
         }
 
+        .sidebar-home {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: rgba(255,255,255,0.5);
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 500;
+            padding: 0.8rem 2rem;
+            transition: all 0.2s;
+            border-left: 4px solid transparent;
+        }
+        .sidebar-home:hover { color: #ffffff; }
+
+        .sidebar-live {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: rgba(255,255,255,0.35);
+            text-decoration: none;
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.6rem 2rem;
+            transition: all 0.2s;
+        }
+        .sidebar-live:hover { color: #2C94C2; }
+
+        .sidebar-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.08);
+            margin: 0.5rem 2rem;
+        }
+
+        .trial-badge-sidebar {
+            margin: 1rem 2rem 0;
+            padding: 6px 12px;
+            background: rgba(44,148,194,0.15);
+            border: 1px solid rgba(44,148,194,0.3);
+            border-radius: 8px;
+            font-size: 0.7rem;
+            color: #2C94C2;
+            text-align: center;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
         .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         .top-bar {
             background: white;
@@ -669,6 +716,7 @@
     <div class="app-container">
         <nav class="sidebar">
             <div class="sidebar-logo">KNOW BRAINER<div style="font-size: 0.8rem; margin-top: 0.3rem; color: white; font-family: 'VVDS Fifties', sans-serif;">Trivia.</div></div>
+            <div class="trial-badge-sidebar">Trial Build</div>
             <ul class="sidebar-nav">
                 <li><a href="#" data-section="dashboard" class="active">📊 Dashboard</a></li>
                 <li><a href="#" data-section="teams">👥 Teams</a></li>
@@ -685,6 +733,9 @@
                 <li><a href="#" data-section="codes">🔐 Codes</a></li>
                 <li><a href="#" data-section="settings">⚙️ Settings</a></li>
             </ul>
+            <div class="sidebar-divider"></div>
+            <a href="/" class="sidebar-home">← Back to Home</a>
+            <a href="https://knowbrainertrivia.com.au" target="_blank" class="sidebar-live">View live site ↗</a>
         </nav>
 
         <div class="main-content">
