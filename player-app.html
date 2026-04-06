@@ -1430,7 +1430,8 @@
             <div class="modal-title">Welcome Back! 🔑</div>
             <div class="input-group">
                 <label class="input-label">Enter Your Team Code</label>
-                <input type="text" id="loginCode" placeholder="e.g., BRAINS2024" style="text-transform: uppercase;">
+                <input type="text" id="loginCode" placeholder="e.g., BRAINS24" style="text-transform: uppercase;" onkeydown="if(event.key==='Enter')handleLogin()">
+                <div id="loginError" style="color:#ff3860;font-size:0.85rem;margin-top:0.4rem;display:none;"></div>
             </div>
             <button class="btn btn-primary btn-block" onclick="handleLogin()">Enter Team</button>
             <button class="btn btn-secondary btn-block" onclick="closeLoginModal()">Cancel</button>
@@ -1737,6 +1738,11 @@
         // Login/Registration
         function showLoginModal() {
             document.getElementById('loginModal').classList.add('active');
+            const input = document.getElementById('loginCode');
+            input.value = '';
+            input.style.borderColor = '';
+            document.getElementById('loginError').style.display = 'none';
+            setTimeout(() => input.focus(), 100);
         }
 
         function closeLoginModal() {
@@ -1744,16 +1750,29 @@
         }
 
         function handleLogin() {
-            const code = document.getElementById('loginCode').value.toUpperCase();
+            const code = document.getElementById('loginCode').value.toUpperCase().trim();
+            const errorEl = document.getElementById('loginError');
+            const inputEl = document.getElementById('loginCode');
+            if (!code) {
+                errorEl.textContent = 'Please enter a team code';
+                errorEl.style.display = 'block';
+                inputEl.style.borderColor = '#ff3860';
+                return;
+            }
             const team = mockTeams.find(t => t.code === code);
             if (team) {
+                errorEl.style.display = 'none';
+                inputEl.style.borderColor = '';
                 appState.currentTeam = { ...team };
                 appState.currentUser = { name: 'Captain', avatar: '🧠' };
                 closeLoginModal();
                 showApp();
                 playSound('chime');
             } else {
-                alert('Team code not found!');
+                errorEl.textContent = 'Team code not found. Try BRAINS24, QUEENS22, or TITANS19';
+                errorEl.style.display = 'block';
+                inputEl.style.borderColor = '#ff3860';
+                inputEl.select();
             }
         }
 
