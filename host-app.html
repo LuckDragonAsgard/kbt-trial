@@ -96,6 +96,38 @@
             margin-top: 2px;
         }
 
+        .header-home {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: rgba(255,255,255,0.6);
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 500;
+            padding: 5px 10px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .header-home:hover { color: #ffffff; background: rgba(255,255,255,0.1); }
+
+        .trial-banner {
+            background: rgba(44,148,194,0.1);
+            border-bottom: 1px solid rgba(44,148,194,0.2);
+            padding: 6px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 11px;
+            color: #718096;
+        }
+        .trial-banner a {
+            color: #2C94C2;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .trial-banner a:hover { text-decoration: underline; }
+
         .header-controls {
             display: flex;
             align-items: center;
@@ -1329,6 +1361,7 @@
         <div class="header">
             <div class="header-brand">KNOW BRAINER <span style="font-size: 12px; color: #ffffff;">Trivia.</span></div>
             <div class="header-controls">
+                <a href="/" class="header-home" title="Back to Home">← Home</a>
                 <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">🌙</button>
                 <button class="sound-toggle" id="soundToggle" title="Toggle Sound">🔊</button>
                 <button class="settings-btn" id="settingsBtn" title="Settings">⚙️</button>
@@ -1337,6 +1370,10 @@
                 <span id="hostName">Host</span>
                 <button class="header-logout" onclick="logout()">Logout</button>
             </div>
+        </div>
+        <div class="trial-banner">
+            <span>Trial Build — Not connected to live data</span>
+            <a href="https://knowbrainertrivia.com.au" target="_blank">View live site ↗</a>
         </div>
 
         <div class="page active" id="dashboardPage">
