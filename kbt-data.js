@@ -1,0 +1,136 @@
+// KBT Trial — shared data layer
+// Abstracts over Supabase (live) and localStorage (offline demo).
+// Usage: drop this <script> into any page BEFORE the page's own code.
+
+(function(){
+  const SUPABASE_URL  = 'https://huvfgenbcaiicatvtxak.supabase.co';
+  const REAL_ANON     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1dmZnZW5iY2FpaWNhdHZ0eGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MTczNjIsImV4cCI6MjA5MTE5MzM2Mn0.uTgzTKYjJnkFlRUIhGfW4ODKyV24xOdKaX7lxpDuMfc';
+  const TARGET_EVENT_CODE = 'TEST-NIGHT-001';
+
+  const MODE_KEY = 'kbtDataMode';
+  function getMode(){
+    const m = localStorage.getItem(MODE_KEY);
+    return (m === 'offline') ? 'offline' : 'live';
+  }
+  function setMode(m){ localStorage.setItem(MODE_KEY, m); }
+
+  async function pgGet(path, params){
+    const url = new URL(SUPABASE_URL + '/rest/v1/' + path);
+    if (params) Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
+    const res = await fetch(url.toString(), {
+      headers: {
+        apikey: REAL_ANON,
+        Authorization: 'Bearer ' + REAL_ANON,
+        Accept: 'application/json'
+      }
+    });
+    if (!res.ok) throw new Error('Supabase GET ' + path + ' -> ' + res.status);
+    return res.json();
+  }
+
+  const live = {
+    async getEvents(){
+      return pgGet('event', {
+        select: 'id,event_code,event_description,event_date,event_status,event_location_id',
+        order: 'event_date.desc'
+      });
+    },
+    async getEventByCode(code){
+      const rows = await pgGet('event', {
+        select: 'id,event_code,event_description,event_date,event_status,event_location_id',
+        event_code: 'eq.' + code,
+        limit: 1
+      });
+      return rows[0] || null;
+    },
+    async getEventLocation(locId){
+      if (!locId) return null;
+      const rows = await pgGet('event_location', {
+        select: 'id,loc_fullname,loc_nickname,loc_suburb,loc_town,loc_dow,loc_time,prize_1st,prize_2nd,prize_bonus',
+        id: 'eq.' + locId,
+        limit: 1
+      });
+      return rows[0] || null;
+    },
+    async getQuizItems(eventId){
+      return pgGet('quiz', {
+        select: 'id,quiz_item_round,quiz_item_number,quiz_item_order,quiz_points,quiz_qtype,question:quiz_question_id(id,question_question_text,question_answer_text,question_question_supporttext,question_fun_fact,question_category_group,question_type,question_image_url,question_audio_url)',
+        quiz_event_id: 'eq.' + eventId,
+        order: 'quiz_item_round.asc,quiz_item_order.asc,quiz_item_number.asc'
+      });
+    },
+    async getRegisteredTeams(eventId){
+      return pgGet('event_team_registrations', {
+        select: 'id,display_name,created_at,team:team_id(id,team_code,team_name,is_active)',
+        event_id: 'eq.' + eventId,
+        order: 'created_at.asc'
+      });
+    },
+    async getAnswersForEvent(eventId){
+      return pgGet('answers', {
+        select: 'id,team_id,question_id,answer_text,round,points_value,created_at',
+        event_id: 'eq.' + eventId
+      });
+    }
+  };
+
+  const offline = {
+    async getEvents(){
+      return [{
+        id: 'offline-event',
+        event_code: 'OFFLINE-DEMO',
+        event_description: 'Offline Demo Night',
+        event_date: new Date().toISOString().slice(0,10),
+        event_status: 'active',
+        event_location_id: null
+      }];
+    },
+    async getEventByCode(){ return (await offline.getEvents())[0]; },
+    async getEventLocation(){ return { loc_fullname: 'Offline Pub', loc_nickname: 'Offline', loc_suburb: 'Demo' }; },
+    async getQuizItems(){ return []; },
+    async getRegisteredTeams(){
+      let teams = [];
+      try { teams = JSON.parse(localStorage.getItem('kbtTeams') || '[]'); } catch(e){}
+      return teams.map(t => ({
+        id: 'offline-' + t.code,
+        display_name: t.name,
+        team: { id: 'offline-t-' + t.code, team_code: t.code, team_name: t.name, is_active: true }
+      }));
+    },
+    async getAnswersForEvent(){ return []; }
+  };
+
+  const api = {
+    mode: getMode,
+    setMode,
+    TARGET_EVENT_CODE,
+    SUPABASE_URL,
+    async ready(){ return true; },
+    async getEvents(){ return (getMode()==='live' ? live : offline).getEvents(); },
+    async getEventByCode(c){ return (getMode()==='live' ? live : offline).getEventByCode(c); },
+    async getEventLocation(id){ return (getMode()==='live' ? live : offline).getEventLocation(id); },
+    async getQuizItems(eid){ return (getMode()==='live' ? live : offline).getQuizItems(eid); },
+    async getRegisteredTeams(eid){ return (getMode()==='live' ? live : offline).getRegisteredTeams(eid); },
+    async getAnswersForEvent(eid){ return (getMode()==='live' ? live : offline).getAnswersForEvent(eid); },
+    shapeQuestion(row){
+      const q = row.question || {};
+      return {
+        id: row.id,
+        round: row.quiz_item_round,
+        number: row.quiz_item_number,
+        order: row.quiz_item_order,
+        points: row.quiz_points || 1,
+        qtype: row.quiz_qtype || 'GENERAL',
+        text: q.question_question_text || '',
+        answer: q.question_answer_text || '',
+        support: q.question_question_supporttext || '',
+        funFact: q.question_fun_fact || '',
+        category: q.question_category_group || q.question_type || '',
+        imageUrl: q.question_image_url || null,
+        audioUrl: q.question_audio_url || null
+      };
+    }
+  };
+
+  window.kbtData = api;
+})();
