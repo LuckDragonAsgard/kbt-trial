@@ -1813,6 +1813,15 @@
             const totalCell = document.getElementById('totalCell-' + teamId);
             if (totalCell) totalCell.innerHTML = '<strong>' + total + '</strong>';
             localStorage.setItem('teamScores', JSON.stringify(teamScores));
+            // Persist round score to Supabase
+            if (window.kbtData) {
+                const team = teams.find(function(t){ return t.id === teamId; });
+                if (team) {
+                    const roundNum = parseInt(round.replace('R', '')) || 1;
+                    window.kbtData.submitRoundScore(null, team.name, roundNum, teamScores[teamId][round])
+                        .catch(function(e){ console.warn('[kbt] score persist failed:', e.message); });
+                }
+            }
         }
 
         function openSettings() {
