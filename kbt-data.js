@@ -29,10 +29,10 @@
     return res.json();
   }
 
-  async function pgPost(path, body){
+  async function pgPost(path, body, prefer){
     const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
       method: 'POST',
-      headers: { ...HEADERS, Prefer: 'return=representation' },
+      headers: { ...HEADERS, Prefer: prefer || 'return=representation' },
       body: JSON.stringify(body)
     });
     if (!res.ok) {
@@ -117,6 +117,32 @@
         select: 'id,team_id,question_id,answer_text,round,points_value,created_at',
         event_id: 'eq.' + eventId
       });
+    },
+    async submitRoundScore(eventCode, teamName, round, points){
+      const rows = await pgPost(
+        'trial_scores',
+        {
+          event_code: eventCode || TARGET_EVENT_CODE,
+          team_name: teamName,
+          round: round,
+          question_number: 0,
+          points: parseInt(points) || 0
+        },
+        'resolution=merge-duplicates,return=representation'
+      );
+      return rows[0] || null;
+    },
+    async getLeaderboard(eventCode){
+      const scores = await pgGet('trial_scores', {
+        select: 'team_name,round,points',
+        event_code: 'eq.' + (eventCode || TARGET_EVENT_CODE),
+        question_number: 'eq.0'
+      });
+      const totals = {};
+      scores.forEach(function(s){ totals[s.team_name] = (totals[s.team_name] || 0) + (s.points || 0); });
+      return Object.entries(totals)
+        .map(function([team_name, total]){ return { team_name: team_name, total: total }; })
+        .sort(function(a, b){ return b.total - a.total; });
     }
   };
 
@@ -151,7 +177,22 @@
       localStorage.setItem('kbtTeams', JSON.stringify(teams));
       return entry;
     },
-    async getAnswersForEvent(){ return []; }
+    async getAnswersForEvent(){ return []; },
+    async submitRoundScore(eventCode, teamName, round, points){
+      let scores = {};
+      try { scores = JSON.parse(localStorage.getItem('kbtScores') || '{}'); } catch(e){}
+      if (!scores[teamName]) scores[teamName] = {};
+      scores[teamName]['R' + round] = parseInt(points) || 0;
+      localStorage.setItem('kbtScores', JSON.stringify(scores));
+      return { team_name: teamName, round: round, points: parseInt(points) || 0 };
+    },
+    async getLeaderboard(){
+      let scores = {};
+      try { scores = JSON.parse(localStorage.getItem('kbtScores') || '{}'); } catch(e){}
+      return Object.entries(scores)
+        .map(function([name, rounds]){ return { team_name: name, total: Object.values(rounds).reduce(function(s,v){ return s+(v||0); }, 0) }; })
+        .sort(function(a, b){ return b.total - a.total; });
+    }
   };
 
   const api = {
@@ -167,6 +208,12 @@
     async getRegisteredTeams(eid){ return (getMode()==='live' ? live : offline).getRegisteredTeams(eid); },
     async registerTeam(code, name, display, color, emoji){
       return (getMode()==='live' ? live : offline).registerTeam(code, name, display, color, emoji);
+    },
+    async submitRoundScore(code, name, round, points){
+      return (getMode()==='live' ? live : offline).submitRoundScore(code, name, round, points);
+    },
+    async getLeaderboard(code){
+      return (getMode()==='live' ? live : offline).getLeaderboard(code);
     },
     async getAnswersForEvent(eid){ return (getMode()==='live' ? live : offline).getAnswersForEvent(eid); },
 
