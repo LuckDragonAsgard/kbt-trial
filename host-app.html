@@ -38,6 +38,60 @@
             --warning: #ffb700;
             --danger: #ff3860;
         }
+        /* Host Login Gate */
+        .host-login-gate {
+            position: fixed; inset: 0; z-index: 9999;
+            background: linear-gradient(135deg, #2C94C2 0%, #1a5f85 100%);
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px; font-family: 'Outfit', sans-serif;
+        }
+        .host-login-gate.hidden { display: none; }
+        .host-login-card {
+            background: #F4F2EE; border-radius: 16px; padding: 40px 32px;
+            max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .host-login-card h1 {
+            font-family: 'VVDS Fifties', sans-serif; color: #000; font-size: 28px;
+            margin-bottom: 8px; letter-spacing: 0.5px;
+        }
+        .host-login-card .subtitle { color: #718096; font-size: 14px; margin-bottom: 24px; }
+        .host-login-card input {
+            width: 100%; padding: 14px 16px; font-size: 18px; font-family: 'Outfit', sans-serif;
+            border: 2px solid #e0e6ed; border-radius: 10px; text-align: center;
+            letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px;
+            background: #ffffff; color: #000;
+        }
+        .host-login-card input:focus { outline: none; border-color: #2C94C2; }
+        .host-login-card button {
+            width: 100%; padding: 14px; background: #2C94C2; color: #fff; border: none;
+            border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer;
+            font-family: 'Outfit', sans-serif; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .host-login-card button:hover { background: #1a5f85; }
+        .host-login-error { color: #ff3860; font-size: 13px; min-height: 18px; margin-bottom: 8px; }
+        .host-login-hint { color: #718096; font-size: 12px; margin-top: 16px; }
+
+        /* Quiz question special badges */
+        .badge-freebie { background: #E8A317 !important; color: #fff !important; }
+        .badge-gambler { background: #ff3860 !important; color: #fff !important; }
+        .badge-bonus { background: #7c3aed !important; color: #fff !important; }
+        .special-question-banner {
+            margin: 12px 0; padding: 10px 14px; border-radius: 8px;
+            font-size: 13px; font-weight: 600; text-align: center;
+        }
+        .special-freebie { background: #fef3c7; color: #92400e; }
+        .special-gambler { background: #fee2e2; color: #991b1b; }
+        .special-bonus { background: #ede9fe; color: #5b21b6; }
+
+        /* Scoring inputs */
+        .score-input {
+            width: 60px; padding: 6px 8px; border: 1px solid #e0e6ed;
+            border-radius: 6px; text-align: center; font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+        }
+        .score-input:focus { outline: none; border-color: #2C94C2; }
+
 
         body.dark-mode {
             --light-bg: #0a0f1e;
@@ -1358,8 +1412,20 @@
             border: none;
         }
     </style>
+    <script src="kbt-data.js"></script>
 </head>
 <body>
+
+    <div class="host-login-gate" id="hostLoginGate">
+        <div class="host-login-card">
+            <h1>Host Portal</h1>
+            <div class="subtitle">Enter your host code to continue</div>
+            <input type="text" id="hostLoginCode" placeholder="HOST01" maxlength="10" autofocus>
+            <div class="host-login-error" id="hostLoginError"></div>
+            <button onclick="hostLoginSubmit()">Enter</button>
+            <div class="host-login-hint">Valid codes for trial: HOST01, HOST02</div>
+        </div>
+    </div>
     <div class="app active">
         <div class="header">
             <div class="header-brand"></div>
@@ -1613,6 +1679,7 @@
 
         function playSound(type) {
             if (!soundEnabled) return;
+            try { if (audioContext.state === 'suspended') audioContext.resume(); } catch (e) {}
             const now = audioContext.currentTime;
             const osc = audioContext.createOscillator();
             const gain = audioContext.createGain();
@@ -1620,7 +1687,8 @@
             gain.connect(audioContext.destination);
             gain.gain.setValueAtTime(0.3, now);
             gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-            
+            osc.start(now);
+
             switch(type) {
                 case 'start':
                     osc.frequency.setValueAtTime(800, now);
@@ -1704,6 +1772,47 @@
         function navigateTo(page) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(page + 'Page').classList.add('active');
+            if (page === 'scoring') renderScoreTable();
+        }
+
+        function renderScoreTable() {
+            const tbody = document.getElementById('scoreTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            teams.forEach(team => {
+                if (!teamScores[team.id]) teamScores[team.id] = { R1: 0, R2: 0, R3: 0 };
+                const s = teamScores[team.id];
+                const total = (s.R1||0) + (s.R2||0) + (s.R3||0);
+                const powerups = (teamPowerups[team.id] || []).map(p => {
+                    const labels = { 'double': '2x', '50/50': '50/50', 'extra': '⏱' };
+                    return `<span class="powerup-badge">${labels[p] || p}</span>`;
+                }).join(' ');
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${team.mascot} ${team.name}</td>
+                    <td><input type="number" class="score-input" value="${s.R1||0}" min="0" onchange="updateTeamScore(${team.id},'R1',this.value)"></td>
+                    <td><input type="number" class="score-input" value="${s.R2||0}" min="0" onchange="updateTeamScore(${team.id},'R2',this.value)"></td>
+                    <td><input type="number" class="score-input" value="${s.R3||0}" min="0" onchange="updateTeamScore(${team.id},'R3',this.value)"></td>
+                    <td id="totalCell-${team.id}"><strong>${total}</strong></td>
+                    <td>${powerups || '—'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            const avg = teams.length ? Math.round(teams.reduce((sum, t) => {
+                const s = teamScores[t.id] || {}; return sum + (s.R1||0) + (s.R2||0) + (s.R3||0);
+            }, 0) / teams.length) : 0;
+            const avgEl = document.getElementById('avgScore');
+            if (avgEl) avgEl.textContent = avg;
+        }
+
+        function updateTeamScore(teamId, round, value) {
+            if (!teamScores[teamId]) teamScores[teamId] = { R1: 0, R2: 0, R3: 0 };
+            teamScores[teamId][round] = parseInt(value) || 0;
+            const s = teamScores[teamId];
+            const total = (s.R1||0) + (s.R2||0) + (s.R3||0);
+            const totalCell = document.getElementById('totalCell-' + teamId);
+            if (totalCell) totalCell.innerHTML = '<strong>' + total + '</strong>';
+            localStorage.setItem('teamScores', JSON.stringify(teamScores));
         }
 
         function openSettings() {
@@ -1714,7 +1823,16 @@
             navigateTo('dashboard');
         }
 
-        let teams = [];
+        let teams = [
+            { id: 1, name: 'The Brain Trust', mascot: '🧠', color: '#2C94C2', code: 'BRAINS24', players: [{name:'Alex',code:'P01'},{name:'Sam',code:'P02'},{name:'Jordan',code:'P03'}] },
+            { id: 2, name: 'Quiz Queens', mascot: '👑', color: '#E8A317', code: 'QUEENS22', players: [{name:'Emma',code:'P04'},{name:'Sophie',code:'P05'}] },
+            { id: 3, name: 'Trivia Titans', mascot: '⚡', color: '#7c3aed', code: 'TITANS19', players: [{name:'Mike',code:'P06'},{name:'Chris',code:'P07'},{name:'Pat',code:'P08'}] }
+        ];
+        let teamScores = {
+            1: { R1: 0, R2: 0, R3: 0 },
+            2: { R1: 0, R2: 0, R3: 0 },
+            3: { R1: 0, R2: 0, R3: 0 }
+        };
         let selectedMascot = '🦁';
         let selectedColor = '#2C94C2';
         let teamPowerups = {};
@@ -1809,6 +1927,44 @@
             closeModal('registrationModal');
             playSound('start');
         }
+
+        
+
+        function hostLoginSubmit() {
+            const input = document.getElementById('hostLoginCode');
+            const err = document.getElementById('hostLoginError');
+            const code = (input.value || '').toUpperCase().trim();
+            const valid = ['HOST01', 'HOST02'];
+            if (valid.includes(code)) {
+                document.getElementById('hostLoginGate').classList.add('hidden');
+                const hostNameEl = document.getElementById('hostName');
+                if (hostNameEl) hostNameEl.textContent = code;
+                localStorage.setItem('kbtHostCode', code);
+                try {
+                    const saved = localStorage.getItem('teamScores');
+                    if (saved) teamScores = JSON.parse(saved);
+                } catch (e) {}
+            } else {
+                err.textContent = 'Invalid host code. Try HOST01 or HOST02.';
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        // Auto-submit on Enter key
+        document.addEventListener('DOMContentLoaded', () => {
+            const hostInput = document.getElementById('hostLoginCode');
+            if (hostInput) {
+                hostInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') hostLoginSubmit();
+                });
+                const saved = localStorage.getItem('kbtHostCode');
+                if (saved && ['HOST01','HOST02'].includes(saved)) {
+                    document.getElementById('hostLoginCode').value = saved;
+                    hostLoginSubmit();
+                }
+            }
+        });
 
         function generateTeamCode() {
             return 'T' + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -1955,10 +2111,44 @@
         }
 
         let currentQuestion = 0;
-        const questions = [
-            { text: 'What is the capital of France?', answer: 'Paris', type: 'General' },
-            { text: 'Which planet is known as the Red Planet?', answer: 'Mars', type: 'Science' },
-            { text: 'In what year did the Titanic sink?', answer: '1912', type: 'History' },
+        let questions = [
+            // ROUND 1 (Q1-10) + Bonus 1 (Q11)
+            { round: 1, num: 1, text: 'Which social media platform, founded in 2004, was originally called "TheFacebook"?', answer: 'Facebook', type: 'Freebie', funFact: 'R1Q1 is always the Facebook Freebie — an easy gimme to warm up the crowd.' },
+            { round: 1, num: 2, text: 'What is the largest planet in our solar system?', answer: 'Jupiter', type: 'Science' },
+            { round: 1, num: 3, text: 'In which year did World War II end?', answer: '1945', type: 'History' },
+            { round: 1, num: 4, text: 'Who painted the Mona Lisa?', answer: 'Leonardo da Vinci', type: 'Art' },
+            { round: 1, num: 5, text: 'What is the chemical symbol for gold?', answer: 'Au', type: 'Science' },
+            { round: 1, num: 6, text: 'Which country is home to the kangaroo?', answer: 'Australia', type: 'Geography' },
+            { round: 1, num: 7, text: 'What is the largest ocean on Earth?', answer: 'Pacific Ocean', type: 'Geography' },
+            { round: 1, num: 8, text: 'Who wrote "Romeo and Juliet"?', answer: 'William Shakespeare', type: 'Literature' },
+            { round: 1, num: 9, text: 'What year did the Berlin Wall fall?', answer: '1989', type: 'History' },
+            { round: 1, num: 10, text: 'What is the smallest country in the world?', answer: 'Vatican City', type: 'Geography' },
+            { round: 1, num: 11, text: 'Bonus: Name all 6 Australian states (no territories).', answer: 'NSW, VIC, QLD, SA, WA, TAS', type: 'Bonus', funFact: 'Bonus 1 lands at R1Q11 — teams can use their Bonus answer sheet.' },
+
+            // ROUND 2 (Q12-21) + Bonus H&T (Q22)
+            { round: 2, num: 12, text: 'Which element has the atomic number 1?', answer: 'Hydrogen', type: 'Science' },
+            { round: 2, num: 13, text: 'What is the capital of Japan?', answer: 'Tokyo', type: 'Geography' },
+            { round: 2, num: 14, text: 'Who was the first President of the United States?', answer: 'George Washington', type: 'History' },
+            { round: 2, num: 15, text: 'What is the tallest mountain in the world?', answer: 'Mount Everest', type: 'Geography' },
+            { round: 2, num: 16, text: 'In which sport would you perform a slam dunk?', answer: 'Basketball', type: 'Sport' },
+            { round: 2, num: 17, text: 'What does "www" stand for?', answer: 'World Wide Web', type: 'Tech' },
+            { round: 2, num: 18, text: 'Which planet is closest to the sun?', answer: 'Mercury', type: 'Science' },
+            { round: 2, num: 19, text: 'What is the longest river in the world?', answer: 'Nile River', type: 'Geography' },
+            { round: 2, num: 20, text: 'Who discovered penicillin?', answer: 'Alexander Fleming', type: 'Science' },
+            { round: 2, num: 21, text: 'What is the currency of the United Kingdom?', answer: 'Pound Sterling', type: 'General' },
+            { round: 2, num: 22, text: 'Bonus H&T: Higher or Lower — is the population of Melbourne higher or lower than 5 million?', answer: 'Higher (approx 5.3M)', type: 'Bonus', funFact: 'Bonus H&T lands at R2Q11 (overall Q22). Teams pick H or T.' },
+
+            // ROUND 3 (Q23-32) - Q32 is the Gambler
+            { round: 3, num: 23, text: 'What is the hardest natural substance on Earth?', answer: 'Diamond', type: 'Science' },
+            { round: 3, num: 24, text: 'Which artist cut off his own ear?', answer: 'Vincent van Gogh', type: 'Art' },
+            { round: 3, num: 25, text: 'What is the largest desert in the world?', answer: 'Antarctic Desert', type: 'Geography' },
+            { round: 3, num: 26, text: 'In Greek mythology, who is the king of the gods?', answer: 'Zeus', type: 'Mythology' },
+            { round: 3, num: 27, text: 'What is the main ingredient in guacamole?', answer: 'Avocado', type: 'Food' },
+            { round: 3, num: 28, text: 'Which band released the album "Dark Side of the Moon"?', answer: 'Pink Floyd', type: 'Music' },
+            { round: 3, num: 29, text: 'What is the speed of light in a vacuum (km/s)?', answer: '299,792 km/s', type: 'Science' },
+            { round: 3, num: 30, text: 'How many continents are there?', answer: '7', type: 'Geography' },
+            { round: 3, num: 31, text: 'Which year did humans first land on the moon?', answer: '1969', type: 'History' },
+            { round: 3, num: 32, text: 'Gambler: What percentage of the human body is water (within 5%)?', answer: '60%', type: 'Gambler', funFact: 'R3Q10 (overall Q32) is always the Gambler — teams wager points.' }
         ];
 
         function nextQuestion() {
@@ -1980,23 +2170,41 @@
         function displayQuestion() {
             const q = questions[currentQuestion];
             const display = document.getElementById('questionDisplay');
+            let badgeClass = 'badge-type';
+            let banner = '';
+            if (q.type === 'Freebie') {
+                badgeClass = 'badge-type badge-freebie';
+                banner = '<div class="special-question-banner special-freebie">⭐ Facebook Freebie — easy warm-up question</div>';
+            } else if (q.type === 'Gambler') {
+                badgeClass = 'badge-type badge-gambler';
+                banner = '<div class="special-question-banner special-gambler">🎲 Gambler — teams wager points on this one</div>';
+            } else if (q.type === 'Bonus') {
+                badgeClass = 'badge-type badge-bonus';
+                banner = '<div class="special-question-banner special-bonus">🎯 Bonus round — separate answer sheet</div>';
+            }
+            const roundLabel = q.round ? 'Round ' + q.round : '';
+            const funFactText = q.funFact || 'This is a fun fact about this question!';
             display.innerHTML = `
                 <div class="question-card">
                     <div class="question-badges">
-                        <span class="badge badge-type">${q.type}</span>
+                        <span class="badge ${badgeClass}">${q.type}</span>
+                        ${roundLabel ? `<span class="badge badge-type">${roundLabel}</span>` : ''}
                     </div>
+                    ${banner}
                     <div class="question-text">${q.text}</div>
                     <button type="button" class="answer-button" onclick="revealAnswer()">Show Answer</button>
                     <div id="answerBox"></div>
                     <div class="fun-fact-toggle" onclick="this.classList.toggle('expanded')">
                         💡 Fun Fact
-                        <div class="fun-fact-text">This is a fun fact about this question!</div>
+                        <div class="fun-fact-text">${funFactText}</div>
                     </div>
                 </div>
             `;
             document.getElementById('currentQuestion').textContent = currentQuestion + 1;
             document.getElementById('totalQuestions').textContent = questions.length;
             document.getElementById('prevBtn').disabled = currentQuestion === 0;
+            const rl = document.getElementById('roundLabel');
+            if (rl && q.round) rl.textContent = 'Round ' + q.round;
         }
 
         function revealAnswer() {
@@ -2057,12 +2265,15 @@
         }
 
         function showLeaderboard() {
-            const leaderboard = teams.map(team => ({
-                name: team.name,
-                mascot: team.mascot,
-                score: Math.floor(Math.random() * 300) + 100,
-                powerups: teamPowerups[team.id] || []
-            })).sort((a, b) => b.score - a.score);
+            const leaderboard = teams.map(team => {
+                const s = teamScores[team.id] || { R1: 0, R2: 0, R3: 0 };
+                return {
+                    name: team.name,
+                    mascot: team.mascot,
+                    score: (s.R1||0) + (s.R2||0) + (s.R3||0),
+                    powerups: teamPowerups[team.id] || []
+                };
+            }).sort((a, b) => b.score - a.score);
 
             displayLeaderboard(leaderboard);
             navigateTo('results');
@@ -2180,6 +2391,61 @@
             timeRemaining = defaultTimer;
             updateTimerDisplay();
             displayQuestion();
+            // After the page is rendered with the fallback questions, try
+            // swapping in the real ones from Supabase (TEST-NIGHT-001).
+            loadLiveQuestions();
+        }
+
+        // Load real quiz items from Supabase and swap them into `questions`.
+        // Falls back silently to the hard-coded array if anything goes wrong.
+        async function loadLiveQuestions() {
+            try {
+                if (!window.kbtData) { console.log('[kbt] data layer not loaded'); return; }
+                const code = window.kbtData.TARGET_EVENT_CODE;
+                const ev = await window.kbtData.getEventByCode(code);
+                if (!ev) { console.log('[kbt] event not found:', code); return; }
+                const rows = await window.kbtData.getQuizItems(ev.id);
+                if (!rows || !rows.length) { console.log('[kbt] no quiz items for', code); return; }
+                const mapped = rows.map(function(r) {
+                    const q = r.question || {};
+                    let type = r.quiz_qtype || 'General';
+                    const t = String(type).toUpperCase();
+                    if (t === 'FREEBIE') type = 'Freebie';
+                    else if (t === 'BONUS' || t === 'BONUS_HT') type = 'Bonus';
+                    else if (t === 'GAMBLER') type = 'Gambler';
+                    else type = type.charAt(0) + type.slice(1).toLowerCase();
+                    return {
+                        round: r.quiz_item_round,
+                        num: r.quiz_item_number,
+                        order: r.quiz_item_order,
+                        points: r.quiz_points || 1,
+                        text: (q.question_question_text || ''),
+                        answer: (q.question_answer_text || ''),
+                        type: type,
+                        funFact: (q.question_fun_fact || q.question_question_supporttext || '')
+                    };
+                });
+                mapped.sort(function(a,b){
+                    return ((a.order||0) - (b.order||0)) || (a.round - b.round) || (a.num - b.num);
+                });
+                questions = mapped;
+                currentQuestion = 0;
+                displayQuestion();
+                console.log('[kbt] loaded ' + mapped.length + ' live questions for ' + code);
+                addKbtBadge('LIVE: ' + code + ' (' + mapped.length + ' Qs)', '#22c55e');
+            } catch (e) {
+                console.warn('[kbt] loadLiveQuestions failed, staying on fallback:', e);
+                addKbtBadge('OFFLINE (fallback questions)', '#6b7280');
+            }
+        }
+
+        function addKbtBadge(text, bg) {
+            const badge = document.createElement('div');
+            badge.textContent = text;
+            badge.style.cssText = 'position:fixed;bottom:10px;right:10px;background:' + bg +
+                ';color:#fff;padding:4px 10px;border-radius:12px;font:600 11px/1.2 sans-serif;' +
+                'z-index:9999;box-shadow:0 2px 6px rgba(0,0,0,.2)';
+            document.body.appendChild(badge);
         }
 
         function logout() {
