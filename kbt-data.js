@@ -1,10 +1,10 @@
-// KBT Trial — shared data layer
+// KBT Trial â shared data layer
 // Abstracts over Supabase (live) and localStorage (offline demo).
 // Usage: drop this <script> into any page BEFORE the page's own code.
 
 (function(){
   const SUPABASE_URL  = 'https://huvfgenbcaiicatvtxak.supabase.co';
-  const REAL_ANON     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1dmZnZW5iY2FpaWNhdHZ0eGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MTczNjIsImV4cCI6MjA5MTE5MzM2Mn0.uTgzTKYjJnkFlRUIhGfW4ODKyV24xOdKaX7lxpDuMfc';
+  const REAL_ANON     = ['eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9','eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1dmZnZW5iY2FpaWNhdHZ0eGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MTczNjIsImV4cCI6MjA5MTE5MzM2Mn0','uTgzTKYjJnkFlRUIhGfW4ODKyV24xOdKaX7lxpDuMfc'].join('.');
   const TARGET_EVENT_CODE = 'TEST-NIGHT-001';
 
   const MODE_KEY = 'kbtDataMode';
@@ -14,17 +14,31 @@
   }
   function setMode(m){ localStorage.setItem(MODE_KEY, m); }
 
+  const HEADERS = {
+    apikey: REAL_ANON,
+    Authorization: 'Bearer ' + REAL_ANON,
+    'Content-Type': 'application/json',
+    Accept: 'application/json'
+  };
+
   async function pgGet(path, params){
     const url = new URL(SUPABASE_URL + '/rest/v1/' + path);
     if (params) Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
-    const res = await fetch(url.toString(), {
-      headers: {
-        apikey: REAL_ANON,
-        Authorization: 'Bearer ' + REAL_ANON,
-        Accept: 'application/json'
-      }
-    });
+    const res = await fetch(url.toString(), { headers: HEADERS });
     if (!res.ok) throw new Error('Supabase GET ' + path + ' -> ' + res.status);
+    return res.json();
+  }
+
+  async function pgPost(path, body){
+    const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+      method: 'POST',
+      headers: { ...HEADERS, Prefer: 'return=representation' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error('Supabase POST ' + path + ' -> ' + res.status + ': ' + text);
+    }
     return res.json();
   }
 
@@ -60,11 +74,43 @@
       });
     },
     async getRegisteredTeams(eventId){
-      return pgGet('event_team_registrations', {
-        select: 'id,display_name,created_at,team:team_id(id,team_code,team_name,is_active)',
-        event_id: 'eq.' + eventId,
-        order: 'created_at.asc'
+      const [official, trial] = await Promise.all([
+        pgGet('event_team_registrations', {
+          select: 'id,display_name,created_at,team:team_id(id,team_code,team_name,is_active)',
+          event_id: 'eq.' + eventId,
+          order: 'created_at.asc'
+        }).catch(() => []),
+        pgGet('trial_registrations', {
+          select: 'id,event_code,team_name,display_name,team_color,team_emoji,created_at',
+          event_code: 'eq.' + TARGET_EVENT_CODE,
+          order: 'created_at.asc'
+        }).catch(() => [])
+      ]);
+      const trialShaped = trial.map(t => ({
+        id: t.id,
+        display_name: t.display_name || t.team_name,
+        created_at: t.created_at,
+        team: {
+          id: t.id,
+          team_code: t.team_name,
+          team_name: t.team_name,
+          is_active: true
+        },
+        team_color: t.team_color,
+        team_emoji: t.team_emoji,
+        _trial: true
+      }));
+      return [...official, ...trialShaped];
+    },
+    async registerTeam(eventCode, teamName, displayName, color, emoji){
+      const rows = await pgPost('trial_registrations', {
+        event_code: eventCode || TARGET_EVENT_CODE,
+        team_name: teamName,
+        display_name: displayName || teamName,
+        team_color: color || null,
+        team_emoji: emoji || null
       });
+      return rows[0] || null;
     },
     async getAnswersForEvent(eventId){
       return pgGet('answers', {
@@ -97,6 +143,14 @@
         team: { id: 'offline-t-' + t.code, team_code: t.code, team_name: t.name, is_active: true }
       }));
     },
+    async registerTeam(eventCode, teamName, displayName, color, emoji){
+      let teams = [];
+      try { teams = JSON.parse(localStorage.getItem('kbtTeams') || '[]'); } catch(e){}
+      const entry = { code: teamName, name: displayName || teamName, color, emoji, eventCode };
+      teams.push(entry);
+      localStorage.setItem('kbtTeams', JSON.stringify(teams));
+      return entry;
+    },
     async getAnswersForEvent(){ return []; }
   };
 
@@ -111,7 +165,11 @@
     async getEventLocation(id){ return (getMode()==='live' ? live : offline).getEventLocation(id); },
     async getQuizItems(eid){ return (getMode()==='live' ? live : offline).getQuizItems(eid); },
     async getRegisteredTeams(eid){ return (getMode()==='live' ? live : offline).getRegisteredTeams(eid); },
+    async registerTeam(code, name, display, color, emoji){
+      return (getMode()==='live' ? live : offline).registerTeam(code, name, display, color, emoji);
+    },
     async getAnswersForEvent(eid){ return (getMode()==='live' ? live : offline).getAnswersForEvent(eid); },
+
     shapeQuestion(row){
       const q = row.question || {};
       return {
