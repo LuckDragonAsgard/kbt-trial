@@ -32,7 +32,6 @@
             overflow: hidden;
         }
 
-        /* Animated background */
         body::before {
             content: '';
             position: fixed;
@@ -60,7 +59,6 @@
             width: 100%;
         }
 
-        /* Logo animation */
         .logo {
             font-family: "VVDS Fifties", sans-serif;
             font-size: clamp(2.8rem, 10vw, 4.5rem);
@@ -98,7 +96,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Badge */
         .badge {
             display: inline-flex;
             align-items: center;
@@ -129,7 +126,6 @@
             50% { opacity: 0.3; }
         }
 
-        /* Portal cards */
         .portals {
             display: flex;
             flex-direction: column;
@@ -157,9 +153,7 @@
             border-color: rgba(44,148,194,0.3);
             transform: translateX(4px);
         }
-        .portal-link:active {
-            transform: scale(0.98);
-        }
+        .portal-link:active { transform: scale(0.98); }
         .portal-icon {
             width: 44px;
             height: 44px;
@@ -173,40 +167,19 @@
         .portal-icon.player { background: rgba(44,148,194,0.2); }
         .portal-icon.host { background: rgba(232,163,23,0.2); }
         .portal-icon.admin { background: rgba(255,255,255,0.08); }
-
         .portal-info { flex: 1; }
-        .portal-name {
-            font-weight: 700;
-            font-size: 1rem;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        .portal-desc {
-            font-size: 0.8rem;
-            opacity: 0.5;
-            margin-top: 0.15rem;
-        }
-        .portal-arrow {
-            font-size: 1.2rem;
-            opacity: 0.3;
-            transition: all 0.25s;
-        }
-        .portal-link:hover .portal-arrow {
-            opacity: 0.8;
-            transform: translateX(3px);
-        }
+        .portal-name { font-weight: 700; font-size: 1rem; letter-spacing: 0.5px; text-transform: uppercase; }
+        .portal-desc { font-size: 0.8rem; opacity: 0.5; margin-top: 0.15rem; }
+        .portal-arrow { font-size: 1.2rem; opacity: 0.3; transition: all 0.25s; }
+        .portal-link:hover .portal-arrow { opacity: 0.8; transform: translateX(3px); }
 
-        /* Divider */
         .divider {
-            width: 60px;
-            height: 1px;
+            width: 60px; height: 1px;
             background: rgba(255,255,255,0.1);
             margin: 1.5rem 0;
             opacity: 0;
             animation: fadeUp 0.8s ease-out 1.2s forwards;
         }
-
-        /* Live site link */
         .live-link {
             opacity: 0;
             animation: fadeUp 0.8s ease-out 1.4s forwards;
@@ -223,23 +196,19 @@
             gap: 0.3rem;
         }
         .live-link a:hover { color: #2C94C2; }
-
-        /* Footer */
         .footer {
             margin-top: 2rem;
             font-size: 0.7rem;
-            opacity: 0.25;
             text-align: center;
             opacity: 0;
             animation: fadeUp 0.8s ease-out 1.6s forwards;
         }
-
-        /* Mobile adjustments */
         @media (max-width: 480px) {
             body { padding: 1.5rem; }
             .portal-link { padding: 1rem 1.2rem; }
         }
     </style>
+    <script src="kbt-data.js"></script>
 </head>
 <body>
     <div class="container">
@@ -247,7 +216,6 @@
         <div class="trivia">Trivia.</div>
         <div class="tagline">Trivia. But Better.</div>
         <div class="badge">Trial Build</div>
-
         <div class="portals">
             <a href="/player-app" class="portal-link">
                 <div class="portal-icon player">🎮</div>
@@ -257,7 +225,6 @@
                 </div>
                 <div class="portal-arrow">›</div>
             </a>
-
             <a href="/host-app" class="portal-link">
                 <div class="portal-icon host">🎤</div>
                 <div class="portal-info">
@@ -266,7 +233,6 @@
                 </div>
                 <div class="portal-arrow">›</div>
             </a>
-
             <a href="/admin-app" class="portal-link">
                 <div class="portal-icon admin">⚙️</div>
                 <div class="portal-info">
@@ -276,16 +242,25 @@
                 <div class="portal-arrow">›</div>
             </a>
         </div>
-
         <div class="divider"></div>
-
         <div class="live-link">
-            <a href="https://knowbrainertrivia.com.au" target="_blank">
-                View live site ↗
-            </a>
+            <a href="https://knowbrainertrivia.com.au" target="_blank">View live site ↗</a>
         </div>
-
-        <div class="footer">KBT Trial Build — Standalone test environment, not connected to live data</div>
+        <div class="footer">KBT Trial Build — Linked to Supabase (<span id="kbtLiveTarget">...</span>)</div>
+        <script>
+          (async function(){
+            try {
+              if (!window.kbtData) return;
+              const ev = await window.kbtData.getEventByCode(window.kbtData.TARGET_EVENT_CODE);
+              const el = document.getElementById('kbtLiveTarget');
+              if (el && ev) el.textContent = ev.event_code + ' · ' + ev.event_description;
+              else if (el) el.textContent = 'offline fallback';
+            } catch(e) {
+              const el = document.getElementById('kbtLiveTarget');
+              if (el) el.textContent = 'offline (conn error)';
+            }
+          })();
+        </script>
     </div>
 </body>
 </html>
