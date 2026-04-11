@@ -1394,6 +1394,7 @@
         }
     </style>
     <script src="kbt-data.js"></script>
+<script src="kbt-data.js"></script>
 </head>
 <body>
     <div id="landingScreen" class="landing">
@@ -1873,7 +1874,7 @@
             selectedMascot = emoji;
         }
 
-        async function completeRegistration() {
+        async async function completeRegistration() {
             tempTeamData.color = selectedColor;
             tempTeamData.mascot = selectedMascot;
             tempTeamData.motto = document.getElementById('teamMotto').value || '';
@@ -1889,6 +1890,21 @@
             appState.currentTeam = tempTeamData;
             appState.currentUser = { name: tempTeamData.playerName, avatar: selectedAvatar };
             playSound('ding');
+
+        if (window.kbtData) {
+            try {
+                await window.kbtData.registerTeam(
+                    window.kbtData.TARGET_EVENT_CODE,
+                    tempTeamData.name,
+                    tempTeamData.playerName,
+                    tempTeamData.color,
+                    tempTeamData.mascot
+                );
+                console.log('[kbt] Team registered in Supabase:', tempTeamData.name);
+            } catch(e) {
+                console.warn('[kbt] Could not write registration to Supabase:', e.message);
+            }
+        }
 
             // Write registration to Supabase
             if (window.kbtData) {
