@@ -36,6 +36,40 @@
             --danger: #ff3860;
             --warning: #ffb700;
         }
+        /* Admin Login Gate */
+        .admin-login-gate {
+            position: fixed; inset: 0; z-index: 9999;
+            background: linear-gradient(135deg, #2C94C2 0%, #1a5f85 100%);
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px; font-family: 'Outfit', sans-serif;
+        }
+        .admin-login-gate.hidden { display: none; }
+        .admin-login-card {
+            background: #F4F2EE; border-radius: 16px; padding: 40px 32px;
+            max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .admin-login-card h1 {
+            font-family: 'VVDS Fifties', sans-serif; color: #000; font-size: 28px;
+            margin-bottom: 8px; letter-spacing: 0.5px;
+        }
+        .admin-login-card .subtitle { color: #718096; font-size: 14px; margin-bottom: 24px; }
+        .admin-login-card input {
+            width: 100%; padding: 14px 16px; font-size: 18px; font-family: 'Outfit', sans-serif;
+            border: 2px solid #e0e6ed; border-radius: 10px; text-align: center;
+            letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px;
+            background: #ffffff; color: #000;
+        }
+        .admin-login-card input:focus { outline: none; border-color: #2C94C2; }
+        .admin-login-card button {
+            width: 100%; padding: 14px; background: #2C94C2; color: #fff; border: none;
+            border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer;
+            font-family: 'Outfit', sans-serif; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .admin-login-card button:hover { background: #1a5f85; }
+        .admin-login-error { color: #ff3860; font-size: 13px; min-height: 18px; margin-bottom: 8px; }
+        .admin-login-hint { color: #718096; font-size: 12px; margin-top: 16px; }
+
 
         [data-theme="dark"] {
             --dark-bg: #020817;
@@ -714,8 +748,19 @@
         }
 
     </style>
+    <script src="kbt-data.js"></script>
 </head>
 <body>
+    <div class="admin-login-gate" id="adminLoginGate">
+        <div class="admin-login-card">
+            <h1>Admin Portal</h1>
+            <div class="subtitle">Enter your admin code to continue</div>
+            <input type="text" id="adminLoginCode" placeholder="ADMIN1" maxlength="10" autofocus>
+            <div class="admin-login-error" id="adminLoginError"></div>
+            <button onclick="adminLoginSubmit()">Enter</button>
+            <div class="admin-login-hint">Valid code for trial: ADMIN1</div>
+        </div>
+    </div>
     <div class="app-container">
         <nav class="sidebar">
             <div class="sidebar-logo">KNOW BRAINER</div>
@@ -758,6 +803,21 @@
             <div class="content-area">
                 <!-- DASHBOARD -->
                 <section class="section active" id="dashboard-section">
+                    <div class="live-teams-widget" id="liveTeamsWidget" style="display:none; background:#e0f2fe; border:1px solid #0284c7; border-radius:10px; padding:16px 20px; margin-bottom:20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <h3 style="color:#075985; margin:0; font-size:16px;">🟢 Live Teams (from Supabase)</h3>
+                            <span id="liveTeamsCount" style="background:#0284c7; color:#fff; padding:2px 10px; border-radius:12px; font-weight:700; font-size:12px;">0</span>
+                        </div>
+                        <div id="liveEventHeader" style="color:#075985; font-size:12px; margin-bottom:8px;"></div>
+                        <div id="liveTeamsList" style="display:flex; flex-direction:column; gap:6px;"></div>
+                    </div>
+                    <div class="pending-registrations-widget" id="pendingRegistrationsWidget" style="display:none; background:#fff3cd; border:1px solid #ffc107; border-radius:10px; padding:16px 20px; margin-bottom:20px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <h3 style="color:#856404; margin:0; font-size:16px;">🕒 Pending Player Registrations</h3>
+                            <span id="pendingRegistrationsCount" style="background:#ffc107; color:#000; padding:2px 10px; border-radius:12px; font-weight:700; font-size:12px;">0</span>
+                        </div>
+                        <div id="pendingRegistrationsList" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
                     <div class="stat-cards">
                         <div class="stat-card">
                             <div class="stat-icon">👥</div>
@@ -800,188 +860,66 @@
                     <h2 class="section-title">📋 Recent Activity</h2>
                     <div class="activity-feed" id="activityFeed"></div>
                 </section>
-
-                <!-- TEAMS -->
                 <section class="section" id="teams-section">
                     <div class="table-container">
                         <div class="table-controls">
                             <div class="search-box"><input type="text" placeholder="Search teams..."></div>
                             <button class="btn btn-primary" onclick="openModal('createTeamModal')">+ Create Team</button>
                         </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Team Name</th>
-                                    <th>Code</th>
-                                    <th>Captain</th>
-                                    <th>Players</th>
-                                    <th>Games</th>
-                                    <th>League Pos</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
+                        <table><thead><tr><th>Team Name</th><th>Code</th><th>Captain</th><th>Players</th><th>Games</th><th>League Pos</th><th>Actions</th></tr></thead><tbody></tbody></table>
                     </div>
                 </section>
-
-                <!-- PLAYERS -->
                 <section class="section" id="players-section">
                     <div class="table-container">
                         <div class="table-controls">
                             <div class="search-box"><input type="text" placeholder="Search players..."></div>
                             <button class="btn btn-primary" onclick="openModal('createPlayerModal')">+ Add Player</button>
                         </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Avatar</th>
-                                    <th>Name</th>
-                                    <th>Code</th>
-                                    <th>Team</th>
-                                    <th>Captain</th>
-                                    <th>Games</th>
-                                    <th>Joined</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
+                        <table><thead><tr><th>Avatar</th><th>Name</th><th>Code</th><th>Team</th><th>Captain</th><th>Games</th><th>Joined</th><th>Actions</th></tr></thead><tbody></tbody></table>
                     </div>
                 </section>
-
-                <!-- VENUES -->
                 <section class="section" id="venues-section">
-                    <div class="table-container">
-                        <div class="table-controls">
-                            <button class="btn btn-primary" onclick="openModal('createVenueModal')">+ Add Venue</button>
-                        </div>
-                    </div>
+                    <div class="table-container"><div class="table-controls"><button class="btn btn-primary" onclick="openModal('createVenueModal')">+ Add Venue</button></div></div>
                     <h3 class="section-title">⚠️ Tuesday Venues</h3>
                     <div class="venue-grid" id="tuesdayVenues"></div>
                     <h3 class="section-title">📅 Other Nights</h3>
                     <div class="venue-grid" id="otherVenues"></div>
                 </section>
-
-                <!-- HOSTS -->
                 <section class="section" id="hosts-section">
                     <div class="table-container">
                         <div class="table-controls">
                             <div class="search-box"><input type="text" placeholder="Search hosts..."></div>
                             <button class="btn btn-primary" onclick="openModal('createHostModal')">+ Add Host</button>
                         </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Code</th>
-                                    <th>Assigned Venues</th>
-                                    <th>Quizzes Hosted</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
+                        <table><thead><tr><th>Name</th><th>Code</th><th>Assigned Venues</th><th>Quizzes Hosted</th><th>Actions</th></tr></thead><tbody></tbody></table>
                     </div>
                 </section>
-
-                <!-- LEAGUES -->
                 <section class="section" id="leagues-section">
-                    <div style="margin-bottom: 2rem;">
-                        <label class="form-label">Select Venue/League:</label>
-                        <select class="form-control" id="venueSelect" onchange="loadLeagueTable()">
-                            <option value="">Choose a venue...</option>
-                        </select>
-                    </div>
-                    <div id="leagueTableContainer" style="display: none;">
-                        <div class="button-group">
-                            <button class="btn btn-primary" onclick="openModal('enterResultsModal')">Enter Results</button>
-                            <button class="btn btn-secondary" onclick="newSeason()">New Season</button>
-                        </div>
-                        <div class="table-container">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Position</th>
-                                        <th>Team</th>
-                                        <th>Played</th>
-                                        <th>Wins</th>
-                                        <th>Points</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <div style="margin-bottom:2rem;"><label class="form-label">Select Venue/League:</label><select class="form-control" id="venueSelect" onchange="loadLeagueTable()"><option value="">Choose a venue...</option></select></div>
+                    <div id="leagueTableContainer" style="display:none;"><div class="button-group"><button class="btn btn-primary" onclick="openModal('enterResultsModal')">Enter Results</button><button class="btn btn-secondary" onclick="newSeason()">New Season</button></div><div class="table-container"><table><thead><tr><th>Position</th><th>Team</th><th>Played</th><th>Wins</th><th>Points</th></tr></thead><tbody></tbody></table></div></div>
                 </section>
-
-                <!-- AWARDS -->
                 <section class="section" id="awards-section">
                     <div class="button-group">
                         <button class="btn btn-primary" onclick="openModal('createAwardModal')">+ Create Custom Award</button>
                         <button class="btn btn-success" onclick="generateAwards()">Generate Awards</button>
                         <button class="btn btn-secondary" onclick="publishAwards()">Publish Awards</button>
                     </div>
-
                     <h3 class="section-title">🏆 Available Award Categories</h3>
                     <div class="badge-grid">
-                        <div class="badge-item">
-                            <div class="badge-emoji">👑</div>
-                            <div class="badge-title">Season Champion</div>
-                            <div class="badge-count">Most league points</div>
-                        </div>
-                        <div class="badge-item">
-                            <div class="badge-emoji">⭐</div>
-                            <div class="badge-title">MVP</div>
-                            <div class="badge-count">Best overall player</div>
-                        </div>
-                        <div class="badge-item">
-                            <div class="badge-emoji">🔥</div>
-                            <div class="badge-title">Hottest Streak</div>
-                            <div class="badge-count">Best consecutive wins</div>
-                        </div>
-                        <div class="badge-item">
-                            <div class="badge-emoji">💪</div>
-                            <div class="badge-title">Most Dedicated</div>
-                            <div class="badge-count">Most games played</div>
-                        </div>
-                        <div class="badge-item">
-                            <div class="badge-emoji">💰</div>
-                            <div class="badge-title">Gambler of Year</div>
-                            <div class="badge-count">Most power-ups used</div>
-                        </div>
-                        <div class="badge-item">
-                            <div class="badge-emoji">🧠</div>
-                            <div class="badge-title">Brain of Year</div>
-                            <div class="badge-count">Highest accuracy</div>
-                        </div>
-                        <div class="badge-item">
-                            <div class="badge-emoji">🦋</div>
-                            <div class="badge-title">Social Butterfly</div>
-                            <div class="badge-count">Most teammates invited</div>
-                        </div>
-                        <div class="badge-item">
-                            <div class="badge-emoji">📈</div>
-                            <div class="badge-title">Most Improved</div>
-                            <div class="badge-count">Biggest score jump</div>
-                        </div>
-                        <div class="badge-item">
-                            <div class="badge-emoji">🍻</div>
-                            <div class="badge-title">Pub Crawler</div>
-                            <div class="badge-count">Most venues attended</div>
-                        </div>
-                        <div class="badge-item">
-                            <div class="badge-emoji">🎖️</div>
-                            <div class="badge-title">Captain Fantastic</div>
-                            <div class="badge-count">Best team leadership</div>
-                        </div>
+                        <div class="badge-item"><div class="badge-emoji">👑</div><div class="badge-title">Season Champion</div><div class="badge-count">Most league points</div></div>
+                        <div class="badge-item"><div class="badge-emoji">⭐</div><div class="badge-title">MVP</div><div class="badge-count">Best overall player</div></div>
+                        <div class="badge-item"><div class="badge-emoji">🔥</div><div class="badge-title">Hottest Streak</div><div class="badge-count">Best consecutive wins</div></div>
+                        <div class="badge-item"><div class="badge-emoji">💪</div><div class="badge-title">Most Dedicated</div><div class="badge-count">Most games played</div></div>
+                        <div class="badge-item"><div class="badge-emoji">💰</div><div class="badge-title">Gambler of Year</div><div class="badge-count">Most power-ups used</div></div>
+                        <div class="badge-item"><div class="badge-emoji">🧠</div><div class="badge-title">Brain of Year</div><div class="badge-count">Highest accuracy</div></div>
+                        <div class="badge-item"><div class="badge-emoji">🦋</div><div class="badge-title">Social Butterfly</div><div class="badge-count">Most teammates invited</div></div>
+                        <div class="badge-item"><div class="badge-emoji">📈</div><div class="badge-title">Most Improved</div><div class="badge-count">Biggest score jump</div></div>
+                        <div class="badge-item"><div class="badge-emoji">🍻</div><div class="badge-title">Pub Crawler</div><div class="badge-count">Most venues attended</div></div>
+                        <div class="badge-item"><div class="badge-emoji">🎖️</div><div class="badge-title">Captain Fantastic</div><div class="badge-count">Best team leadership</div></div>
                     </div>
-
                     <h3 class="section-title">🎁 Generated Awards</h3>
                     <div id="generatedAwardsContainer"></div>
                 </section>
-
-                <!-- BADGES -->
                 <section class="section" id="badges-section">
                     <div class="button-group">
                         <button class="btn btn-primary" onclick="openModal('createBadgeModal')">+ Create Badge</button>
@@ -990,11 +928,9 @@
                     </div>
                     <div class="badge-grid" id="badgeGrid"></div>
                 </section>
-
-                <!-- POWER-UPS -->
                 <section class="section" id="powerups-section">
                     <div class="button-group">
-                        <button class="btn btn-primary" onclick="openModal('managePowerupsModal')">Manage Power-ups</button>
+       <button class="btn btn-primary" onclick="openModal('managePowerupsModal')">Manage Power-ups</button>
                     </div>
 
                     <div class="grid-2">
@@ -1587,7 +1523,24 @@
         function toggleSetting(element) { element.classList.toggle('active'); }
         function saveSettings() { alert('Settings saved!'); }
         function saveAdminProfile() { alert('Admin profile updated!'); }
-        function regenerateAdminCode() { alert('New admin code: ADM-' + Math.random().toString(36).substr(2, 9).toUpperCase()); }
+        function regenerateAdminCode() {
+            const newCode = 'ADM-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+            alert('New admin code generated: ' + newCode + '\n\n(Trial build only — this is a mock regeneration and is not persisted.)');
+        }
+
+        function adminLoginSubmit() {
+            const input = document.getElementById('adminLoginCode');
+            const err = document.getElementById('adminLoginError');
+            const code = (input.value || '').toUpperCase().trim();
+            if (code === 'ADMIN1') {
+                document.getElementById('adminLoginGate').classList.add('hidden');
+                localStorage.setItem('kbtAdminCode', code);
+            } else {
+                err.textContent = 'Invalid admin code. Try ADMIN1.';
+                input.value = '';
+                input.focus();
+            }
+        }
 
         function generateBulkCodes() { alert('Generated 10 team codes and 10 player codes'); }
         function loadLeagueTable() { document.getElementById('leagueTableContainer').style.display = 'block'; }
@@ -1595,7 +1548,78 @@
         function enterResults() { alert('Results saved!'); closeModal('enterResultsModal'); }
         function logout() { window.location.reload(); }
 
+        function renderPendingRegistrations() {
+            let queue = [];
+            try { queue = JSON.parse(localStorage.getItem('kbtPendingRegistrations') || '[]'); } catch (e) { queue = []; }
+            const widget = document.getElementById('pendingRegistrationsWidget');
+            const list = document.getElementById('pendingRegistrationsList');
+            const count = document.getElementById('pendingRegistrationsCount');
+            if (!widget || !list || !count) return;
+            if (!queue.length) { widget.style.display = 'none'; return; }
+            widget.style.display = 'block';
+            count.textContent = queue.length;
+            list.innerHTML = '';
+            queue.forEach((entry, idx) => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid #ffe58f; border-radius:6px; padding:10px 14px;';
+                const when = new Date(entry.ts || Date.now()).toLocaleString();
+                row.innerHTML = `
+                    <div>
+                        <div style="font-weight:600; color:#333;">${entry.name || '(unnamed)'}</div>
+                        <div style="font-size:12px; color:#856404;">wants to join <strong>${entry.teamName || entry.teamCode || 'team'}</strong> (code ${entry.teamCode || '—'}) • ${when}</div>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn btn-primary btn-small" style="padding:6px 12px; font-size:12px;" onclick="approvePendingRegistration(${idx})">Approve</button>
+                        <button class="btn btn-secondary btn-small" style="padding:6px 12px; font-size:12px;" onclick="rejectPendingRegistration(${idx})">Reject</button>
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        function approvePendingRegistration(idx) {
+            let queue = [];
+            try { queue = JSON.parse(localStorage.getItem('kbtPendingRegistrations') || '[]'); } catch (e) {}
+            const entry = queue[idx];
+            if (!entry) return;
+            queue.splice(idx, 1);
+            localStorage.setItem('kbtPendingRegistrations', JSON.stringify(queue));
+            alert('Approved ' + entry.name + ' into ' + (entry.teamName || entry.teamCode));
+            renderPendingRegistrations();
+        }
+
+        function rejectPendingRegistration(idx) {
+            let queue = [];
+            try { queue = JSON.parse(localStorage.getItem('kbtPendingRegistrations') || '[]'); } catch (e) {}
+            const entry = queue[idx];
+            if (!entry) return;
+            queue.splice(idx, 1);
+            localStorage.setItem('kbtPendingRegistrations', JSON.stringify(queue));
+            renderPendingRegistrations();
+        }
+
+        // Refresh widget every 5 seconds to pick up new registrations from other tabs
+        setInterval(renderPendingRegistrations, 5000);
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'kbtPendingRegistrations') renderPendingRegistrations();
+        });
+
         document.addEventListener('DOMContentLoaded', function() {
+            renderPendingRegistrations();
+            loadLiveTeams();
+            setInterval(loadLiveTeams, 5000);
+            const adminInput = document.getElementById('adminLoginCode');
+            if (adminInput) {
+                adminInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') adminLoginSubmit();
+                });
+                const saved = localStorage.getItem('kbtAdminCode');
+                if (saved === 'ADMIN1') {
+                    adminInput.value = saved;
+                    adminLoginSubmit();
+                }
+            }
+
             initTheme();
             generateCharts();
             loadAnnouncements();
@@ -1608,6 +1632,47 @@
             if (document.getElementById('powerupGrid')) document.getElementById('powerupGrid').innerHTML = html;
             if (document.getElementById('powerupManagementList')) document.getElementById('powerupManagementList').innerHTML = html;
         });
+
+        async function loadLiveTeams() {
+            try {
+                if (!window.kbtData) return;
+                const code = window.kbtData.TARGET_EVENT_CODE;
+                const ev = await window.kbtData.getEventByCode(code);
+                const widget = document.getElementById('liveTeamsWidget');
+                const list = document.getElementById('liveTeamsList');
+                const count = document.getElementById('liveTeamsCount');
+                const header = document.getElementById('liveEventHeader');
+                if (!widget || !list || !count) return;
+                if (!ev) {
+                    widget.style.display = 'none';
+                    return;
+                }
+                header.textContent = ev.event_description + ' (' + ev.event_date + ') — status: ' + (ev.event_status || '—');
+                const regs = await window.kbtData.getRegisteredTeams(ev.id);
+                widget.style.display = 'block';
+                count.textContent = regs.length;
+                list.innerHTML = '';
+                if (!regs.length) {
+                    const empty = document.createElement('div');
+                    empty.style.cssText = 'background:#fff; border:1px dashed #7dd3fc; border-radius:6px; padding:10px 14px; color:#075985; font-size:13px;';
+                    empty.textContent = 'No teams registered yet. Players can join by entering a team code on the player page.';
+                    list.appendChild(empty);
+                    return;
+                }
+                regs.forEach(function(r) {
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid #bae6fd; border-radius:6px; padding:10px 14px;';
+                    const team = r.team || {};
+                    row.innerHTML =
+                        '<div><div style="font-weight:600; color:#0c4a6e;">' + (r.display_name || team.team_name || '(unnamed)') + '</div>' +
+                        '<div style="font-size:12px; color:#0369a1;">code ' + (team.team_code || '—') + '</div></div>' +
+                        '<div style="font-size:11px; color:#64748b;">' + new Date(r.created_at || Date.now()).toLocaleTimeString() + '</div>';
+                    list.appendChild(row);
+                });
+            } catch (e) {
+                console.warn('[kbt] loadLiveTeams failed:', e);
+            }
+        }
     </script>
 </body>
 </html>
