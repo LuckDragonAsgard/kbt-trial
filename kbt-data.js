@@ -118,6 +118,7 @@
         event_id: 'eq.' + eventId
       });
     },
+    async getRoundScores(code){ return (getMode()==='live'?live:offline).getRoundScores(code); },
     async submitRoundScore(eventCode, teamName, round, points){
       const rows = await pgPost(
         'trial_scores',
@@ -209,6 +210,7 @@
     async registerTeam(code, name, display, color, emoji){
       return (getMode()==='live' ? live : offline).registerTeam(code, name, display, color, emoji);
     },
+    async getRoundScores(code){ return (getMode()==='live'?live:offline).getRoundScores(code); },
     async submitRoundScore(code, name, round, points){
       return (getMode()==='live' ? live : offline).submitRoundScore(code, name, round, points);
     },
