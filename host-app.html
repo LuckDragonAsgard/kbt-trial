@@ -1790,9 +1790,9 @@
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${team.mascot} ${team.name}</td>
-                    <td><input type="number" class="score-input" value="${s.R1||0}" min="0" onchange="updateTeamScore(${team.id},'R1',this.value)"></td>
-                    <td><input type="number" class="score-input" value="${s.R2||0}" min="0" onchange="updateTeamScore(${team.id},'R2',this.value)"></td>
-                    <td><input type="number" class="score-input" value="${s.R3||0}" min="0" onchange="updateTeamScore(${team.id},'R3',this.value)"></td>
+                    <td><input type="number" class="score-input" value="${s.R1||0}" min="0" onchange="updateTeamScore('${team.id}','R1',this.value)"></td>
+                    <td><input type="number" class="score-input" value="${s.R2||0}" min="0" onchange="updateTeamScore('${team.id}','R2',this.value)"></td>
+                    <td><input type="number" class="score-input" value="${s.R3||0}" min="0" onchange="updateTeamScore('${team.id}','R3',this.value)"></td>
                     <td id="totalCell-${team.id}"><strong>${total}</strong></td>
                     <td>${powerups || '—'}</td>
                 `;
@@ -2463,7 +2463,41 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', init);
+        async function loadTeamsFromSupabase() {
+            if (!window.kbtData) return;
+            try {
+                const code = window.kbtData.TARGET_EVENT_CODE;
+                const ev = await window.kbtData.getEventByCode(code);
+                if (!ev) return;
+                const regs = await window.kbtData.getRegisteredTeams(ev.id);
+                if (!regs.length) return;
+                teams = regs.map(function(r) {
+                    const t = r.team || {};
+                    return {
+                        id: r.id,
+                        name: t.team_name || r.display_name || '(unnamed)',
+                        mascot: r.team_emoji || '🎯',
+                        color: r.team_color || '#2C94C2',
+                        code: t.team_code || r.id,
+                        players: []
+                    };
+                });
+                teams.forEach(function(t) {
+                    if (!teamScores[t.id]) teamScores[t.id] = { R1: 0, R2: 0, R3: 0 };
+                });
+                displayTeams();
+                const scoringPage = document.getElementById('scoringPage');
+                if (scoringPage && scoringPage.classList.contains('active')) renderScoreTable();
+                console.log('[kbt] loaded', teams.length, 'teams from Supabase');
+            } catch(e) {
+                console.warn('[kbt] loadTeamsFromSupabase failed:', e.message);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            init();
+            loadTeamsFromSupabase();
+        });
     </script>
 </body>
 </html>
