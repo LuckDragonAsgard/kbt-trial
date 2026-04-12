@@ -1789,11 +1789,11 @@
                 }).join(' ');
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${team.mascot} ${team.name}</td>
+                    <td><span style="display:inline-flex;align-items:center;gap:8px;"><span style="width:12px;height:12px;border-radius:50%;background:${team.color||'#2C94C2'};flex-shrink:0;"></span><span style="font-size:18px;">${team.mascot||'🎯'}</span><span style="font-weight:600;">${team.name}</span></span></td>
                     <td><input type="number" class="score-input" value="${s.R1||0}" min="0" onchange="updateTeamScore('${team.id}','R1',this.value)"></td>
                     <td><input type="number" class="score-input" value="${s.R2||0}" min="0" onchange="updateTeamScore('${team.id}','R2',this.value)"></td>
                     <td><input type="number" class="score-input" value="${s.R3||0}" min="0" onchange="updateTeamScore('${team.id}','R3',this.value)"></td>
-                    <td id="totalCell-${team.id}"><strong>${total}</strong></td>
+                    <td id="totalCell-${team.id}"><strong style="font-size:16px;color:#0369a1;">${total}</strong></td>
                     <td>${powerups || '—'}</td>
                 `;
                 tbody.appendChild(row);
@@ -2485,10 +2485,19 @@
                 teams.forEach(function(t) {
                     if (!teamScores[t.id]) teamScores[t.id] = { R1: 0, R2: 0, R3: 0 };
                 });
+                try {
+                    const rows = await window.kbtData.getRoundScores(code);
+                    const nameToId = {};
+                    teams.forEach(function(t){ nameToId[t.name]=t.id; });
+                    rows.forEach(function(r){
+                        const id=nameToId[r.team_name];
+                        if(id){if(!teamScores[id])teamScores[id]={R1:0,R2:0,R3:0};teamScores[id]['R'+r.round]=r.points||0;}
+                    });
+                } catch(e){ console.warn('[kbt] score restore failed:',e.message); }
                 displayTeams();
                 const scoringPage = document.getElementById('scoringPage');
                 if (scoringPage && scoringPage.classList.contains('active')) renderScoreTable();
-                console.log('[kbt] loaded', teams.length, 'teams from Supabase');
+                console.log('[kbt] loaded', teams.length, 'teams + scores from Supabase');
             } catch(e) {
                 console.warn('[kbt] loadTeamsFromSupabase failed:', e.message);
             }
