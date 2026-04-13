@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Face Morph Generator</title>
+<style>
+  :root {
+    --bg:#0b0d12; --card:#141821; --edge:#1f2531; --ink:#e8ecf3; --mute:#8892a6;
+    --accent:#7c5cff; --accent2:#2dd4bf;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  header{padding:28px 24px 8px;text-align:center}
+  header h1{margin:0;font-size:26px;letter-spacing:.2px}
+  header p{margin:6px 0 0;color:var(--mute);font-size:14px}
+  main{max-width:1100px;margin:0 auto;padding:18px 20px 80px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:780px){.row{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--edge);border-radius:14px;padding:16px}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--mute);text-transform:uppercase;letter-spacing:.8px}
+  .drop{border:1.5px dashed #2a3142;border-radius:12px;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;color:var(--mute);cursor:pointer;position:relative;overflow:hidden;background:#0f131b}
+  .drop.has-img{border-style:solid;border-color:#2a3142}
+  .drop canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:auto}
+  .drop .hint{padding:14px;text-align:center;pointer-events:none}
+  .drop .hint strong{color:var(--ink)}
+  .drop input{display:none}
+  .tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  button,.btn{background:#1b2130;color:var(--ink);border:1px solid #2a3142;border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer;font-weight:500}
+  button:hover,.btn:hover{background:#232a3d}
+  button.primary{background:linear-gradient(135deg,var(--accent),#5b7cff);border:none;color:#fff}
+  button.primary:hover{filter:brightness(1.1)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .stage{margin-top:18px;background:var(--card);border:1px solid var(--edge);border-radius:14px;padding:18px}
+  .stage h3{margin:0 0 12px;font-size:14px;color:var(--mute);text-transform:uppercase;letter-spacing:.8px}
+  .preview{background:#0f131b;border-radius:12px;display:flex;align-items:center;justify-content:center;min-height:360px;padding:16px}
+  .preview canvas{max-width:100%;max-height:520px;border-radius:8px}
+  .controls{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
+  .controls label{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.7px}
+  .controls input[type=range]{flex:1;min-width:180px;accent-color:var(--accent)}
+  .pct{min-width:44px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink);font-size:13px}
+  .note{color:var(--mute);font-size:12px;margin-top:8px;line-height:1.5}
+  .pill{display:inline-block;background:#1b2130;border:1px solid #2a3142;color:var(--mute);border-radius:999px;padding:2px 10px;font-size:11px;margin-left:6px}
+  .marker-legend{display:flex;gap:10px;color:var(--mute);font-size:11px;margin-top:6px}
+  .marker-legend span{display:inline-flex;align-items:center;gap:4px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+</style>
+</head>
+<body>
+<header>
+  <h1>Face Morph Generator</h1>
+  <p>Upload two face photos, align the eyes, and blend between them.</p>
+</header>
+<main>
+  <div class="row">
+    <div class="card">
+      <h3>Image A <span class="pill" id="modeA">pan</span></h3>
+      <label class="drop" id="dropA">
+        <canvas id="canvasA" width="512" height="512"></canvas>
+        <div class="hint" id="hintA"><strong>Click to upload</strong><br>or drop an image here</div>
+        <input type="file" accept="image/*" id="fileA">
+      </label>
+      <div class="tools">
+        <button id="alignA">Mark eyes</button>
+        <button id="clearA">Clear eyes</button>
+        <button id="swapFileA">Change image</button>
+      </div>
+      <div class="marker-legend">
+        <span><i class="dot" style="background:#2dd4bf"></i> left eye</span>
+        <span><i class="dot" style="background:#f472b6"></i> right eye</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Image B <span class="pill" id="modeB">pan</span></h3>
+      <label class="drop" id="dropB">
+        <canvas id="canvasB" width="512" height="512"></canvas>
+        <div class="hint" id="hintB"><strong>Click to upload</strong><br>or drop an image here</div>
+        <input type="file" accept="image/*" id="fileB">
+      </label>
+      <div class="tools">
+        <button id="alignB">Mark eyes</button>
+        <button id="clearB">Clear eyes</button>
+        <button id="swapFileB">Change image</button>
+      </div>
+      <div class="marker-legend">
+        <span><i class="dot" style="background:#2dd4bf"></i> left eye</span>
+        <span><i class="dot" style="background:#f472b6"></i> right eye</span>
+      </div>
+    </div>
+  </div>
+  <div class="stage">
+    <h3>Morph Preview</h3>
+    <div class="preview"><canvas id="out" width="640" height="640"></canvas></div>
+    <div class="controls">
+      <label>Blend</label>
+      <input type="range" id="blend" min="0" max="100" value="50">
+      <span class="pct" id="pct">50%</span>
+      <button id="play" class="primary">Play morph</button>
+      <button id="download">Download PNG</button>
+    </div>
+    <p class="note">Tip: click <strong>Mark eyes</strong> on each image and click the left then right eye. When both images have eyes marked, the morph auto-aligns so the faces line up before blending.</p>
+  </div>
+</main>
+<script>
+(()=>{const state={A:{img:null,eyes:[],mode:'pan',pan:{x:0,y:0,scale:1}},B:{img:null,eyes:[],mode:'pan',pan:{x:0,y:0,scale:1}}};const SIZE=512;const $=id=>document.getElementById(id);const canvasA=$('canvasA'),canvasB=$('canvasB'),out=$('out');const ctxA=canvasA.getContext('2d'),ctxB=canvasB.getContext('2d'),ctxOut=out.getContext('2d');function loadFile(file,which){if(!file)return;const img=new Image();img.onload=()=>{const s=state[which];s.img=img;const scale=Math.min(SIZE/img.width,SIZE/img.height);s.pan={x:(SIZE-img.width*scale)/2,y:(SIZE-img.height*scale)/2,scale};s.eyes=[];$('hint'+which).style.display='none';$('drop'+which).classList.add('has-img');drawInput(which);drawOutput()};img.src=URL.createObjectURL(file)}function drawInput(which){const s=state[which];const ctx=which==='A'?ctxA:ctxB;ctx.clearRect(0,0,SIZE,SIZE);if(!s.img)return;ctx.drawImage(s.img,s.pan.x,s.pan.y,s.img.width*s.pan.scale,s.img.height*s.pan.scale);s.eyes.forEach((p,i)=>{ctx.beginPath();ctx.arc(p.x,p.y,8,0,Math.PI*2);ctx.fillStyle=i===0?'#2dd4bf':'#f472b6';ctx.globalAlpha=.9;ctx.fill();ctx.globalAlpha=1;ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke()});if(s.eyes.length===2){ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(s.eyes[0].x,s.eyes[0].y);ctx.lineTo(s.eyes[1].x,s.eyes[1].y);ctx.stroke();ctx.setLineDash([])}}function alignedCanvas(which,targetEyes){const s=state[which];const c=document.createElement('canvas');c.width=SIZE;c.height=SIZE;const ctx=c.getContext('2d');if(!s.img)return c;if(s.eyes.length===2&&targetEyes&&targetEyes.length===2){const srcL=s.eyes[0],srcR=s.eyes[1];const tgtL=targetEyes[0],tgtR=targetEyes[1];const srcDx=srcR.x-srcL.x,srcDy=srcR.y-srcL.y;const tgtDx=tgtR.x-tgtL.x,tgtDy=tgtR.y-tgtL.y;const srcLen=Math.hypot(srcDx,srcDy)||1;const tgtLen=Math.hypot(tgtDx,tgtDy)||1;const sc=tgtLen/srcLen;const srcAng=Math.atan2(srcDy,srcDx);const tgtAng=Math.atan2(tgtDy,tgtDx);const rot=tgtAng-srcAng;ctx.save();ctx.translate(tgtL.x,tgtL.y);ctx.rotate(rot);ctx.scale(sc,sc);ctx.translate(-srcL.x,-srcL.y);const tmp=document.createElement('canvas');tmp.width=SIZE;tmp.height=SIZE;const tctx=tmp.getContext('2d');tctx.drawImage(s.img,s.pan.x,s.pan.y,s.img.width*s.pan.scale,s.img.height*s.pan.scale);ctx.drawImage(tmp,0,0);ctx.restore()}else{ctx.drawImage(s.img,s.pan.x,s.pan.y,s.img.width*s.pan.scale,s.img.height*s.pan.scale)}return c}function drawOutput(){const blend=+$('blend').value/100;$('pct').textContent=Math.round(blend*100)+'%';const W=out.width,H=out.height;ctxOut.clearRect(0,0,W,H);const target=[{x:W*0.36,y:H*0.42},{x:W*0.64,y:H*0.42}];const sc=W/SIZE;const targetIn512=target.map(p=>({x:p.x/sc,y:p.y/sc}));const aCanvas=alignedCanvas('A',targetIn512);const bCanvas=alignedCanvas('B',targetIn512);ctxOut.globalAlpha=1;if(state.A.img){ctxOut.drawImage(aCanvas,0,0,W,H)}if(state.B.img){ctxOut.globalAlpha=blend;ctxOut.drawImage(bCanvas,0,0,W,H);ctxOut.globalAlpha=1}if(!state.A.img&&!state.B.img){ctxOut.fillStyle='#8892a6';ctxOut.font='16px -apple-system,Segoe UI,Roboto';ctxOut.textAlign='center';ctxOut.fillText('Upload two face photos to see the morph',W/2,H/2)}}function wireDrop(which){const drop=$('drop'+which);const file=$('file'+which);drop.addEventListener('click',e=>{if(state[which].mode==='pan')file.click()});drop.addEventListener('dragover',e=>{e.preventDefault();drop.style.borderColor='#7c5cff'});drop.addEventListener('dragleave',e=>{drop.style.borderColor=''});drop.addEventListener('drop',e=>{e.preventDefault();drop.style.borderColor='';if(e.dataTransfer.files&&e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0],which)});file.addEventListener('change',e=>loadFile(e.target.files[0],which));const canvas=which==='A'?canvasA:canvasB;canvas.addEventListener('click',(e)=>{if(state[which].mode!=='eye')return;if(!state[which].img)return;const rect=canvas.getBoundingClientRect();const x=(e.clientX-rect.left)*(canvas.width/rect.width);const y=(e.clientY-rect.top)*(canvas.height/rect.height);if(state[which].eyes.length>=2)state[which].eyes=[];state[which].eyes.push({x,y});drawInput(which);if(state[which].eyes.length===2){state[which].mode='pan';$('mode'+which).textContent='pan'}drawOutput()},true)}wireDrop('A');wireDrop('B');$('alignA').addEventListener('click',()=>{state.A.mode='eye';state.A.eyes=[];$('modeA').textContent='click L eye';drawInput('A');drawOutput()});$('alignB').addEventListener('click',()=>{state.B.mode='eye';state.B.eyes=[];$('modeB').textContent='click L eye';drawInput('B');drawOutput()});$('clearA').addEventListener('click',()=>{state.A.eyes=[];state.A.mode='pan';$('modeA').textContent='pan';drawInput('A');drawOutput()});$('clearB').addEventListener('click',()=>{state.B.eyes=[];state.B.mode='pan';$('modeB').textContent='pan';drawInput('B');drawOutput()});$('swapFileA').addEventListener('click',()=>$('fileA').click());$('swapFileB').addEventListener('click',()=>$('fileB').click());$('blend').addEventListener('input',drawOutput);let playing=false,raf=0;$('play').addEventListener('click',()=>{if(playing){playing=false;cancelAnimationFrame(raf);$('play').textContent='Play morph';return}if(!state.A.img||!state.B.img){alert('Upload both images first.');return}playing=true;$('play').textContent='Stop';const dur=2400;const start=performance.now();function tick(now){if(!playing)return;const t=((now-start)%(dur*2))/dur;const v=t<=1?t:2-t;$('blend').value=Math.round(v*100);drawOutput();raf=requestAnimationFrame(tick)}raf=requestAnimationFrame(tick)});$('download').addEventListener('click',()=>{if(!state.A.img&&!state.B.img){alert('Upload images first.');return}const link=document.createElement('a');link.download='face-morph.png';link.href=out.toDataURL('image/png');link.click()});drawOutput()})();
+</script>
+</body>
+</html>
