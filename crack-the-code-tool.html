@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crack The Code - KBT Tool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Londrina+Solid:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #1a1a2e;
+            color: #fff;
+            font-family: 'Londrina Solid', cursive;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        header {
+            background: linear-gradient(135deg, #47B5D0 0%, #3a95ad 100%);
+            padding: 40px 20px;
+            border-radius: 12px;
+            margin-bottom: 40px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(71, 181, 208, 0.3);
+        }
+
+        h1 {
+            font-family: 'Luckiest Guy', cursive;
+            font-size: 3em;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.95;
+            letter-spacing: 0.5px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .input-section {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 2px solid rgba(71, 181, 208, 0.2);
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+            font-size: 1.1em;
+            color: #47B5D0;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(71, 181, 208, 0.3);
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'Londrina Solid', cursive;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #47B5D0;
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 0 12px rgba(71, 181, 208, 0.2);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .cipher-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .cipher-card {
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(71, 181, 208, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .cipher-card:hover {
+            background: rgba(71, 181, 208, 0.15);
+            border-color: #47B5D0;
+            transform: translateY(-2px);
+        }
+
+        .cipher-card.selected {
+            background: rgba(71, 181, 208, 0.3);
+            border-color: #47B5D0;
+            box-shadow: 0 0 16px rgba(71, 181, 208, 0.4);
+        }
+
+        .cipher-card .cipher-name {
+            font-family: 'Luckiest Guy', cursive;
+            font-size: 1.2em;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+
+        .cipher-card .cipher-desc {
+            font-size: 0.85em;
+            opacity: 0.8;
+        }
+
+        .shift-control {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .shift-control input {
+            flex: 1;
+        }
+
+        .shift-value {
+            min-width: 60px;
+            text-align: center;
+            color: #47B5D0;
+            font-weight: 700;
+        }
+
+        .generate-btn {
+            background: linear-gradient(135deg, #47B5D0 0%, #3a95ad 100%);
+            color: #fff;
+            border: none;
+            padding: 16px 40px;
+            border-radius: 8px;
+            font-family: 'Luckiest Guy', cursive;
+            font-size: 1.3em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 16px rgba(71, 181, 208, 0.3);
+        }
+
+        .generate-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(71, 181, 208, 0.4);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .results-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .result-container {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid rgba(71, 181, 208, 0.2);
+        }
+
+        .result-title {
+            font-family: 'Luckiest Guy', cursive;
+            font-size: 1.5em;
+            color: #47B5D0;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        canvas {
+            width: 100%;
+            height: auto;
+            border: 2px solid rgba(71, 181, 208, 0.3);
+            border-radius: 8px;
+            display: block;
+            background: #000;
+            margin-bottom: 15px;
+        }
+
+        .download-btn {
+            width: 100%;
+            padding: 12px;
+            background: rgba(71, 181, 208, 0.2);
+            border: 2px solid #47B5D0;
+            color: #fff;
+            border-radius: 6px;
+            font-family: 'Londrina Solid', cursive;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover {
+            background: rgba(71, 181, 208, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .error-message {
+            background: rgba(255, 100, 100, 0.2);
+            border: 2px solid #ff6464;
+            color: #ff9999;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🔐 CRACK THE CODE 🔐</h1>
+        <p class="subtitle">Choose your cipher and create an encoded challenge</p>
+    </header>
+
+    <div class="container">
+        <div class="input-section">
+            <div class="input-group">
+                <label>Your Answer (the secret):</label>
+                <textarea id="answer-input" placeholder="Enter the word or phrase to encode..."></textarea>
+            </div>
+
+            <div class="input-group">
+                <label>Clue (optional):</label>
+                <input type="text" id="clue-input" placeholder="Provide a hint for solving the code...">
+            </div>
+
+            <div class="input-group">
+                <label>Choose a Cipher Type:</label>
+                <div class="cipher-selector">
+                    <div class="cipher-card selected" data-cipher="caesar">
+                        <div class="cipher-name">Caesar Shift</div>
+                        <div class="cipher-desc">Classic letter shifting</div>
+                    </div>
+                    <div class="cipher-card" data-cipher="number">
+                        <div class="cipher-name">Number Code</div>
+                        <div class="cipher-desc">Letter to number mapping</div>
+                    </div>
+                    <div class="cipher-card" data-cipher="emoji">
+                        <div class="cipher-name">Emoji Cipher</div>
+                        <div class="cipher-desc">Replace letters with emojis</div>
+                    </div>
+                    <div class="cipher-card" data-cipher="reverse">
+                        <div class="cipher-name">Reverse Text</div>
+                        <div class="cipher-desc">Read it backwards!</div>
+                    </div>
+                    <div class="cipher-card" data-cipher="mirror">
+                        <div class="cipher-name">Mirror/Flip</div>
+                        <div class="cipher-desc">Flip the letters</div>
+                    </div>
+                    <div class="cipher-card" data-cipher="symbol">
+                        <div class="cipher-name">Symbol Swap</div>
+                        <div class="cipher-desc">Replace letters with symbols</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-group" id="caesar-shift-control" style="display: none;">
+                <label>Shift Value:</label>
+                <div class="shift-control">
+                    <input type="number" id="shift-slider" min="0" max="25" value="3">
+                    <span class="shift-value" id="shift-value-display">3</span>
+                </div>
+            </div>
+
+            <div id="error-message" class="error-message hidden"></div>
+            <button class="generate-btn" id="generate-btn">🎨 Generate Cipher 🎨</button>
+        </div>
+
+        <div class="results-section" id="results-section" style="display: none;">
+            <div class="result-container">
+                <div class="result-title">Question</div>
+                <canvas id="question-canvas" width="800" height="600"></canvas>
+                <button class="download-btn" id="download-question">⬇️ Download Question</button>
+            </div>
+            <div class="result-container">
+                <div class="result-title">Answer</div>
+                <canvas id="answer-canvas" width="800" height="600"></canvas>
+                <button class="download-btn" id="download-answer">⬇️ Download Answer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const emojis = ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂'];
+        const symbols = ['⚡', '💎', '🎭', '🌟', '✨', '⭐', '🎪', '🎨', '🎯', '🎲', '🎰', '🎱', '🎳', '🎮', '🎼', '🎵'];
+        let currentCipher = 'caesar';
+        let cipherData = null;
+
+        // Cipher card selection
+        document.querySelectorAll('.cipher-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.cipher-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+                currentCipher = this.dataset.cipher;
+                const caesarControl = document.getElementById('caesar-shift-control');
+                if (currentCipher === 'caesar') {
+                    caesarControl.style.display = 'block';
+                } else {
+                    caesarControl.style.display = 'none';
+                }
+            });
+        });
+
+        // Shift slider
+        document.getElementById('shift-slider')?.addEventListener('input', function() {
+            document.getElementById('shift-value-display').textContent = this.value;
+        });
+
+        // Caesar cipher
+        function encryptCaesar(text, shift) {
+            return text.toUpperCase().split('').map(char => {
+                if (!/[A-Z]/.test(char)) return char === ' ' ? '0' : char;
+                return ((char.charCodeAt(0) - 64 + parseInt(shift)) % 26).toString().padStart(2, '0');
+            }).join('-');
+        }
+
+        // Number code
+        function createNumberCode(text) {
+            const code = text.toUpperCase().split('').map(char => {
+                if (!/[A-Z]/.test(char)) return char === ' ' ? '0' : char;
+                return (char.charCodeAt(0) - 64).toString().padStart(2, '0');
+            }).join('-');
+            return code;
+        }
+
+        // Emoji code
+        function createEmojiCode(text) {
+            const key = {};
+            const chars = [...new Set(text.toUpperCase().replace(/[^A-Z]/g, ''))];
+            let emojiIndex = 0;
+            chars.forEach(char => {
+                if (!key[char]) {
+                    key[char] = emojis[emojiIndex % emojis.length];
+                    emojiIndex++;
+                }
+            });
+
+            const encoded = text.toUpperCase().split('').map(char => {
+                return /[A-Z]/.test(char) ? key[char] : char;
+            }).join('');
+
+            return { encoded, key };
+        }
+
+        function reverseText(text) {
+            return text.split('').reverse().join('');
+        }
+
+        function mirrorText(text) {
+            const mirrorMap = {
+                'A': '⅄', 'M': 'W', 'T': '⊥', 'U': '⋀', 'V': 'Λ', 'W': 'M', 'Y': '⅄',
+                'b': 'q', 'd': 'p', 'N': 'N', 'Z': 'Z', 'S': 'S'
+            };
+            return text.split('').map(char => mirrorMap[char] || char).reverse().join('');
+        }
+
+        function createSymbolCode(text) {
+            const key = {};
+            const chars = [...new Set(text.toUpperCase().replace(/[^A-Z]/g, ''))];
+            chars.forEach((char, idx) => {
+                key[char] = symbols[idx % symbols.length];
+            });
+
+            const partialKeyCount = Math.ceil(chars.length / 3);
+            const partialKey = {};
+            chars.slice(0, partialKeyCount).forEach(char => {
+                partialKey[char] = key[char];
+            });
+
+            const encoded = text.toUpperCase().split('').map(char => {
+                return /[A-Z]/.test(char) ? key[char] : char;
+            }).join('');
+
+            return { encoded, partialKey, fullKey: key };
+        }
+
+        function generateCipher(text) {
+            const cleanText = text.trim();
+            if (!cleanText) return null;
+
+            switch (currentCipher) {
+                case 'caesar':
+                    const shift = document.getElementById('shift-slider').value;
+                    return {
+                        type: 'caesar',
+                        encrypted: encryptCaesar(cleanText, shift),
+                        shift: shift,
+                        keyInfo: `Shift: ${shift}`
+                    };
+                case 'number':
+                    return {
+                        type: 'number',
+                        encrypted: createNumberCode(cleanText),
+                        keyInfo: 'A=01, B=02, C=03, ... Z=26, Space=0'
+                    };
+                case 'emoji':
+                    const emojiData = createEmojiCode(cleanText);
+                    return {
+                        type: 'emoji',
+                        encrypted: emojiData.encoded,
+                        key: emojiData.key,
+                        keyInfo: 'Emoji Key (shown below)'
+                    };
+                case 'reverse':
+                    return {
+                        type: 'reverse',
+                        encrypted: reverseText(cleanText),
+                        keyInfo: 'Read it backwards!'
+                    };
+                case 'mirror':
+                    return {
+                        type: 'mirror',
+                        encrypted: mirrorText(cleanText),
+                        keyInfo: 'Mirror/flip the text'
+                    };
+                case 'symbol':
+                    const symbolData = createSymbolCode(cleanText);
+                    return {
+                        type: 'symbol',
+                        encrypted: symbolData.encoded,
+                        partialKey: symbolData.partialKey,
+                        fullKey: symbolData.fullKey,
+                        keyInfo: 'Partial key shown (solve for the rest!)'
+                    };
+            }
+        }
+
+        // Canvas rendering
+        function drawQuestionCanvas(canvas, cipherData, clue) {
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, w, h);
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(1, '#0f3460');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, w, h);
+
+            // Decorative border
+            ctx.strokeStyle = 'rgba(71, 181, 208, 0.3)';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(40, 40, w - 80, h - 80);
+
+            // Header
+            ctx.font = 'bold 80px "Luckiest Guy"';
+            ctx.fillStyle = '#47B5D0';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('🔐 CRACK THE CODE 🔐', w / 2, 80);
+
+            // Encrypted text
+            ctx.font = '120px "Londrina Solid"';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const encryptedY = h / 2 - 100;
+            wrapText(ctx, cipherData.encrypted, w / 2, encryptedY, 1800, 180);
+
+            // Key information
+            ctx.font = '48px "Londrina Solid"';
+            ctx.fillStyle = '#47B5D0';
+            ctx.textAlign = 'center';
+            const keyY = h / 2 + 150;
+            ctx.fillText(cipherData.keyInfo, w / 2, keyY);
+
+            // Emoji/Symbol key visualization
+            if (cipherData.type === 'emoji' && cipherData.key) {
+                drawEmojiKey(ctx, cipherData.key, w, h);
+            } else if (cipherData.type === 'symbol' && cipherData.partialKey) {
+                drawSymbolKey(ctx, cipherData.partialKey, w, h);
+            }
+
+            // Clue if provided
+            if (clue) {
+                ctx.font = '44px "Londrina Solid"';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.textAlign = 'center';
+                const clueY = h - 120;
+                wrapText(ctx, `💡 ${clue}`, w / 2, clueY, 1600, 100);
+            }
+        }
+
+        function drawAnswerCanvas(canvas, originalText) {
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Background gradient (slightly different)
+            const gradient = ctx.createLinearGradient(0, 0, 0, h);
+            gradient.addColorStop(0, '#0a4d68');
+            gradient.addColorStop(1, '#1a1a2e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, w, h);
+
+            // Decorative border
+            ctx.strokeStyle = 'rgba(71, 181, 208, 0.5)';
+            ctx.lineWidth = 6;
+            ctx.strokeRect(40, 40, w - 80, h - 80);
+
+            // Success header
+            ctx.font = 'bold 80px "Luckiest Guy"';
+            ctx.fillStyle = '#47B5D0';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('✨ THE ANSWER IS ✨', w / 2, 80);
+
+            // Answer text
+            ctx.font = '160px "Luckiest Guy"';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const textY = h / 2;
+            wrapText(ctx, originalText.toUpperCase(), w / 2, textY, 1800, 200);
+
+            // Celebration
+            ctx.font = '100px "Luckiest Guy"';
+            ctx.fillStyle = '#47B5D0';
+            ctx.textAlign = 'center';
+            ctx.fillText('🎉 SOLVED! 🎉', w / 2, h - 150);
+        }
+
+        function drawEmojiKey(ctx, key, w, h) {
+            const entries = Object.entries(key).slice(0, 10);
+            const keyY = h - 280;
+            ctx.font = '40px "Londrina Solid"';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.textAlign = 'center';
+            ctx.fillText('Key:', w / 2, keyY);
+
+            const keyItemY = keyY + 80;
+            const itemWidth = Math.min(150, (w - 200) / Math.min(entries.length, 5));
+
+            entries.forEach((entry, idx) => {
+                const col = idx % 5;
+                const row = Math.floor(idx / 5);
+                const x = (w / 2 - (itemWidth * 5) / 2) + col * itemWidth + itemWidth / 2;
+                const y = keyItemY + row * 120;
+
+                ctx.font = '60px Arial';
+                ctx.fillText(entry[1], x, y);
+                ctx.font = '50px "Londrina Solid"';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fillText(entry[0], x, y + 70);
+            });
+        }
+
+        function drawSymbolKey(ctx, partialKey, w, h) {
+            const entries = Object.entries(partialKey);
+            const keyY = h - 280;
+            ctx.font = '40px "Londrina Solid"';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.textAlign = 'center';
+            ctx.fillText('Partial Key (Solve the Rest!)', w / 2, keyY);
+
+            const keyItemY = keyY + 80;
+            const itemWidth = 200;
+
+            entries.forEach((entry, idx) => {
+                const x = (w / 2 - (itemWidth * entries.length) / 2) + idx * itemWidth + itemWidth / 2;
+                const y = keyItemY;
+
+                ctx.font = '70px Arial';
+                ctx.fillText(entry[1], x - 50, y);
+                ctx.font = '60px "Londrina Solid"';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fillText('=', x, y + 20);
+                ctx.font = '60px "Londrina Solid"';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.fillText(entry[0], x + 50, y);
+            });
+        }
+
+        function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+            const lines = [];
+            let currentLine = '';
+
+            text.split(' ').forEach(word => {
+                const testLine = currentLine + (currentLine ? ' ' : '') + word;
+                const metrics = ctx.measureText(testLine);
+
+                if (metrics.width > maxWidth && currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    currentLine = testLine;
+                }
+            });
+            lines.push(currentLine);
+
+            const totalHeight = lines.length * lineHeight;
+            const startY = y - (totalHeight / 2);
+
+            lines.forEach((line, idx) => {
+                ctx.fillText(line, x, startY + idx * lineHeight);
+            });
+        }
+
+        // Generate button
+        document.getElementById('generate-btn').addEventListener('click', () => {
+            const answer = document.getElementById('answer-input').value;
+            const errorMsg = document.getElementById('error-message');
+            errorMsg.classList.remove('show');
+
+            if (!answer.trim()) {
+                errorMsg.textContent = 'Please enter an answer word or phrase';
+                errorMsg.classList.add('show');
+                return;
+            }
+
+            cipherData = generateCipher(answer);
+            if (!cipherData) {
+                errorMsg.textContent = 'Invalid input. Please try again.';
+                errorMsg.classList.add('show');
+                return;
+            }
+
+            const clue = document.getElementById('clue-input').value;
+
+            // Draw canvases
+            const questionCanvas = document.getElementById('question-canvas');
+            const answerCanvas = document.getElementById('answer-canvas');
+
+            drawQuestionCanvas(questionCanvas, cipherData, clue);
+            drawAnswerCanvas(answerCanvas, answer);
+
+            // Show results
+            document.getElementById('results-section').style.display = 'grid';
+            window.scrollTo({ top: document.getElementById('results-section').offsetTop - 100, behavior: 'smooth' });
+        });
+
+        // Download functions
+        function downloadCanvas(canvas, filename) {
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = filename;
+            link.click();
+        }
+
+        document.getElementById('download-question').addEventListener('click', () => {
+            const answer = document.getElementById('answer-input').value.replace(/ +/g, '-');
+            downloadCanvas(document.getElementById('question-canvas'), `CodeA-Question-${answer}.png`);
+        });
+
+        document.getElementById('download-answer').addEventListener('click', () => {
+            const answer = document.getElementById('answer-input').value.replace(/ +/g, '-');
+            downloadCanvas(document.getElementById('answer-canvas'), `CodeB-Answer-${answer}.png`);
+        });
+
+        // Enter key to generate
+        document.getElementById('answer-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('generate-btn').click();
+            }
+        });
+    </script>
+</body>
+</html>
