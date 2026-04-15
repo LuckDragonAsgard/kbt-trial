@@ -1,108 +1,442 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Face Morph Generator</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KBT Face Morph Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One+SC&family=Londrina+Solid:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.14/dist/face-api.js"></script>
 <style>
-  :root {
-    --bg:#0b0d12; --card:#141821; --edge:#1f2531; --ink:#e8ecf3; --mute:#8892a6;
-    --accent:#7c5cff; --accent2:#2dd4bf;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
-  header{padding:28px 24px 8px;text-align:center}
-  header h1{margin:0;font-size:26px;letter-spacing:.2px}
-  header p{margin:6px 0 0;color:var(--mute);font-size:14px}
-  main{max-width:1100px;margin:0 auto;padding:18px 20px 80px}
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media (max-width:780px){.row{grid-template-columns:1fr}}
-  .card{background:var(--card);border:1px solid var(--edge);border-radius:14px;padding:16px}
-  .card h3{margin:0 0 10px;font-size:14px;color:var(--mute);text-transform:uppercase;letter-spacing:.8px}
-  .drop{border:1.5px dashed #2a3142;border-radius:12px;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;color:var(--mute);cursor:pointer;position:relative;overflow:hidden;background:#0f131b}
-  .drop.has-img{border-style:solid;border-color:#2a3142}
-  .drop canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:auto}
-  .drop .hint{padding:14px;text-align:center;pointer-events:none}
-  .drop .hint strong{color:var(--ink)}
-  .drop input{display:none}
-  .tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-  button,.btn{background:#1b2130;color:var(--ink);border:1px solid #2a3142;border-radius:10px;padding:9px 14px;font-size:13px;cursor:pointer;font-weight:500}
-  button:hover,.btn:hover{background:#232a3d}
-  button.primary{background:linear-gradient(135deg,var(--accent),#5b7cff);border:none;color:#fff}
-  button.primary:hover{filter:brightness(1.1)}
-  button:disabled{opacity:.5;cursor:not-allowed}
-  .stage{margin-top:18px;background:var(--card);border:1px solid var(--edge);border-radius:14px;padding:18px}
-  .stage h3{margin:0 0 12px;font-size:14px;color:var(--mute);text-transform:uppercase;letter-spacing:.8px}
-  .preview{background:#0f131b;border-radius:12px;display:flex;align-items:center;justify-content:center;min-height:360px;padding:16px}
-  .preview canvas{max-width:100%;max-height:520px;border-radius:8px}
-  .controls{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
-  .controls label{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.7px}
-  .controls input[type=range]{flex:1;min-width:180px;accent-color:var(--accent)}
-  .pct{min-width:44px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink);font-size:13px}
-  .note{color:var(--mute);font-size:12px;margin-top:8px;line-height:1.5}
-  .pill{display:inline-block;background:#1b2130;border:1px solid #2a3142;color:var(--mute);border-radius:999px;padding:2px 10px;font-size:11px;margin-left:6px}
-  .marker-legend{display:flex;gap:10px;color:var(--mute);font-size:11px;margin-top:6px}
-  .marker-legend span{display:inline-flex;align-items:center;gap:4px}
-  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Londrina Solid', cursive;
+  background: #f5f5f5;
+  background-image: linear-gradient(0deg,rgba(200,200,200,.18) 1px,transparent 1px),
+                    linear-gradient(90deg,rgba(200,200,200,.18) 1px,transparent 1px);
+  background-size: 40px 40px;
+  min-height: 100vh;
+  padding: 32px 20px 60px;
+}
+.container { max-width: 1020px; margin: 0 auto; }
+header { text-align:center; margin-bottom:32px; }
+.logo { font-family:'Bowlby One SC',cursive; font-size:2.2em; color:#222; }
+.logo span { color:#9c27b0; }
+.subtitle { font-size:1.05em; color:#999; margin-top:4px; }
+.divider { width:50px; height:4px; background:#9c27b0; margin:12px auto 0; border-radius:2px; }
+.upload-row { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:22px; }
+.face-card { background:#fff; border:2px solid #e0e0e0; border-radius:16px; padding:18px; transition:border-color .2s; }
+.face-card.ok { border-color:#9c27b0; }
+.face-label { font-family:'Bowlby One SC',cursive; font-size:.9em; color:#9c27b0; margin-bottom:10px; }
+.drop-zone {
+  border:2px dashed #ddd; border-radius:12px; height:220px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:all .2s; overflow:hidden; position:relative; background:#fafafa;
+}
+.drop-zone:hover,.drop-zone.over { border-color:#9c27b0; background:#f3e5f5; }
+.drop-zone img { width:100%; height:100%; object-fit:contain; position:absolute; top:0; left:0; }
+.hint { color:#bbb; font-size:.88em; text-align:center; pointer-events:none; }
+.hint span { font-size:2em; display:block; margin-bottom:6px; }
+input[type=file] { display:none; }
+.name-input {
+  width:100%; margin-top:10px; padding:9px 13px;
+  border:2px solid #e0e0e0; border-radius:10px;
+  font-family:'Londrina Solid',cursive; font-size:1em; color:#333; outline:none;
+  transition:border-color .2s;
+}
+.name-input:focus { border-color:#9c27b0; }
+.name-input::placeholder { color:#ccc; }
+.controls { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
+.btn-gen {
+  background:#9c27b0; color:#fff; border:none;
+  padding:13px 38px; border-radius:50px;
+  font-family:'Bowlby One SC',cursive; font-size:1.05em; letter-spacing:1px;
+  cursor:pointer; transition:all .2s;
+}
+.btn-gen:hover:not(:disabled) { background:#7b1fa2; transform:translateY(-2px); }
+.btn-gen:disabled { opacity:.45; cursor:not-allowed; }
+.btn-dl {
+  background:#fff; color:#9c27b0; border:2px solid #9c27b0;
+  padding:11px 26px; border-radius:50px;
+  font-family:'Bowlby One SC',cursive; font-size:.88em;
+  cursor:pointer; transition:all .2s;
+}
+.btn-dl:hover { background:#f3e5f5; }
+.prog-box {
+  background:#fff; border:2px solid #e0e0e0; border-radius:14px;
+  padding:18px 22px; margin-bottom:22px; display:none;
+}
+.prog-box.on { display:block; }
+.prog-title { font-family:'Bowlby One SC',cursive; font-size:.92em; color:#9c27b0; margin-bottom:8px; }
+.prog-track { background:#f0e4f7; border-radius:99px; height:8px; overflow:hidden; }
+.prog-fill { height:100%; background:linear-gradient(90deg,#9c27b0,#ce93d8); border-radius:99px; transition:width .35s; width:0; }
+.prog-msg { font-size:.87em; color:#777; margin-top:7px; min-height:1.2em; }
+.err-msg { font-size:.87em; color:#c62828; margin-top:6px; font-weight:bold; }
+.preview-box { display:none; }
+.preview-box.on { display:block; }
+.tab-row { display:flex; gap:8px; margin-bottom:14px; }
+.tab {
+  background:#f5f5f5; border:2px solid #e0e0e0; border-radius:10px;
+  padding:9px 20px; font-family:'Bowlby One SC',cursive; font-size:.85em; cursor:pointer;
+}
+.tab.on { background:#9c27b0; color:#fff; border-color:#9c27b0; }
+.canvas-wrap { background:#111; border-radius:14px; overflow:hidden; text-align:center; padding:10px; }
+.canvas-wrap canvas { max-width:100%; height:auto; border-radius:10px; }
+.dl-row { display:flex; gap:12px; margin-top:14px; }
 </style>
 </head>
 <body>
+<div class="container">
 <header>
-  <h1>Face Morph Generator</h1>
-  <p>Upload two face photos, align the eyes, and blend between them.</p>
+  <div class="logo">KOW BRAINER <span>FACE MORPH</span></div>
+  <p class="subtitle">Two faces. One morph. Who are they?</p>
+  <div class="divider"></div>
 </header>
-<main>
-  <div class="row">
-    <div class="card">
-      <h3>Image A <span class="pill" id="modeA">pan</span></h3>
-      <label class="drop" id="dropA">
-        <canvas id="canvasA" width="512" height="512"></canvas>
-        <div class="hint" id="hintA"><strong>Click to upload</strong><br>or drop an image here</div>
-        <input type="file" accept="image/*" id="fileA">
-      </label>
-      <div class="tools">
-        <button id="alignA">Mark eyes</button>
-        <button id="clearA">Clear eyes</button>
-        <button id="swapFileA">Change image</button>
-      </div>
-      <div class="marker-legend">
-        <span><i class="dot" style="background:#2dd4bf"></i> left eye</span>
-        <span><i class="dot" style="background:#f472b6"></i> right eye</span>
-      </div>
-    </div>
-    <div class="card">
-      <h3>Image B <span class="pill" id="modeB">pan</span></h3>
-      <label class="drop" id="dropB">
-        <canvas id="canvasB" width="512" height="512"></canvas>
-        <div class="hint" id="hintB"><strong>Click to upload</strong><br>or drop an image here</div>
-        <input type="file" accept="image/*" id="fileB">
-      </label>
-      <div class="tools">
-        <button id="alignB">Mark eyes</button>
-        <button id="clearB">Clear eyes</button>
-        <button id="swapFileB">Change image</button>
-      </div>
-      <div class="marker-legend">
-        <span><i class="dot" style="background:#2dd4bf"></i> left eye</span>
-        <span><i class="dot" style="background:#f472b6"></i> right eye</span>
-      </div>
-    </div>
+
+<div class="upload-row">
+  <div class="face-card" id="card1">
+    <div class="face-label">Face 1</div>
+    <div class="drop-zone" id="zone1"><div class="hint"><span>ð·</span>Drop photo or click</div></div>
+    <input type="file" id="file1" accept="image/*">
+    <input class="name-input" id="name1" placeholder="Celebrity name">
   </div>
-  <div class="stage">
-    <h3>Morph Preview</h3>
-    <div class="preview"><canvas id="out" width="640" height="640"></canvas></div>
-    <div class="controls">
-      <label>Blend</label>
-      <input type="range" id="blend" min="0" max="100" value="50">
-      <span class="pct" id="pct">50%</span>
-      <button id="play" class="primary">Play morph</button>
-      <button id="download">Download PNG</button>
-    </div>
-    <p class="note">Tip: click <strong>Mark eyes</strong> on each image and click the left then right eye. When both images have eyes marked, the morph auto-aligns so the faces line up before blending.</p>
+  <div class="face-card" id="card2">
+    <div class="face-label">Face 2</div>
+    <div class="drop-zone" id="zone2"><div class="hint"><span>ð·</span>Drop photo or click</div></div>
+    <input type="file" id="file2" accept="image/*">
+    <input class="name-input" id="name2" placeholder="Celebrity name">
+    <button id="aiMorphHintBtn" onclick="generateMorphHint()" style="margin-top:8px;background:linear-gradient(135deg,#0f766e,#2dd4bf);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%;letter-spacing:0.5px;">ð¤ AI Generate Host Clue</button>
+    <div id="aiMorphPanel" style="display:none;margin-top:10px;background:#0a1818;border:1px solid #2dd4bf;border-radius:10px;padding:14px;font-size:14px;color:#99f6e4;line-height:1.6;font-style:italic;text-align:center;"></div>
   </div>
-</main>
+</div>
+
+<div class="controls">
+  <button class="btn-gen" id="btnGen" disabled>â¡ Generate Morph</button>
+</div>
+
+<div class="prog-box" id="progBox">
+  <div class="prog-title" id="progTitle">Workingâ¦</div>
+  <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+  <div class="prog-msg" id="progMsg"></div>
+  <div class="err-msg" id="errMsg"></div>
+</div>
+
+<div class="preview-box" id="previewBox">
+  <div class="tab-row">
+    <button class="tab on" id="tabA" onclick="showSlide('A')">Slide A â Question</button>
+    <button class="tab" id="tabB" onclick="showSlide('B')">Slide B â Answer</button>
+  </div>
+  <div class="canvas-wrap"><canvas id="cv"></canvas></div>
+  <div class="dl-row">
+    <button class="btn-dl" onclick="dl('A')">â¬ Download Slide A</button>
+    <button class="btn-dl" onclick="dl('B')">â¬ Download Slide B</button>
+  </div>
+</div>
+</div>
+
 <script>
-(()=>{const state={A:{img:null,eyes:[],mode:'pan',pan:{x:0,y:0,scale:1}},B:{img:null,eyes:[],mode:'pan',pan:{x:0,y:0,scale:1}}};const SIZE=512;const $=id=>document.getElementById(id);const canvasA=$('canvasA'),canvasB=$('canvasB'),out=$('out');const ctxA=canvasA.getContext('2d'),ctxB=canvasB.getContext('2d'),ctxOut=out.getContext('2d');function loadFile(file,which){if(!file)return;const img=new Image();img.onload=()=>{const s=state[which];s.img=img;const scale=Math.min(SIZE/img.width,SIZE/img.height);s.pan={x:(SIZE-img.width*scale)/2,y:(SIZE-img.height*scale)/2,scale};s.eyes=[];$('hint'+which).style.display='none';$('drop'+which).classList.add('has-img');drawInput(which);drawOutput()};img.src=URL.createObjectURL(file)}function drawInput(which){const s=state[which];const ctx=which==='A'?ctxA:ctxB;ctx.clearRect(0,0,SIZE,SIZE);if(!s.img)return;ctx.drawImage(s.img,s.pan.x,s.pan.y,s.img.width*s.pan.scale,s.img.height*s.pan.scale);s.eyes.forEach((p,i)=>{ctx.beginPath();ctx.arc(p.x,p.y,8,0,Math.PI*2);ctx.fillStyle=i===0?'#2dd4bf':'#f472b6';ctx.globalAlpha=.9;ctx.fill();ctx.globalAlpha=1;ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke()});if(s.eyes.length===2){ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(s.eyes[0].x,s.eyes[0].y);ctx.lineTo(s.eyes[1].x,s.eyes[1].y);ctx.stroke();ctx.setLineDash([])}}function alignedCanvas(which,targetEyes){const s=state[which];const c=document.createElement('canvas');c.width=SIZE;c.height=SIZE;const ctx=c.getContext('2d');if(!s.img)return c;if(s.eyes.length===2&&targetEyes&&targetEyes.length===2){const srcL=s.eyes[0],srcR=s.eyes[1];const tgtL=targetEyes[0],tgtR=targetEyes[1];const srcDx=srcR.x-srcL.x,srcDy=srcR.y-srcL.y;const tgtDx=tgtR.x-tgtL.x,tgtDy=tgtR.y-tgtL.y;const srcLen=Math.hypot(srcDx,srcDy)||1;const tgtLen=Math.hypot(tgtDx,tgtDy)||1;const sc=tgtLen/srcLen;const srcAng=Math.atan2(srcDy,srcDx);const tgtAng=Math.atan2(tgtDy,tgtDx);const rot=tgtAng-srcAng;ctx.save();ctx.translate(tgtL.x,tgtL.y);ctx.rotate(rot);ctx.scale(sc,sc);ctx.translate(-srcL.x,-srcL.y);const tmp=document.createElement('canvas');tmp.width=SIZE;tmp.height=SIZE;const tctx=tmp.getContext('2d');tctx.drawImage(s.img,s.pan.x,s.pan.y,s.img.width*s.pan.scale,s.img.height*s.pan.scale);ctx.drawImage(tmp,0,0);ctx.restore()}else{ctx.drawImage(s.img,s.pan.x,s.pan.y,s.img.width*s.pan.scale,s.img.height*s.pan.scale)}return c}function drawOutput(){const blend=+$('blend').value/100;$('pct').textContent=Math.round(blend*100)+'%';const W=out.width,H=out.height;ctxOut.clearRect(0,0,W,H);const target=[{x:W*0.36,y:H*0.42},{x:W*0.64,y:H*0.42}];const sc=W/SIZE;const targetIn512=target.map(p=>({x:p.x/sc,y:p.y/sc}));const aCanvas=alignedCanvas('A',targetIn512);const bCanvas=alignedCanvas('B',targetIn512);ctxOut.globalAlpha=1;if(state.A.img){ctxOut.drawImage(aCanvas,0,0,W,H)}if(state.B.img){ctxOut.globalAlpha=blend;ctxOut.drawImage(bCanvas,0,0,W,H);ctxOut.globalAlpha=1}if(!state.A.img&&!state.B.img){ctxOut.fillStyle='#8892a6';ctxOut.font='16px -apple-system,Segoe UI,Roboto';ctxOut.textAlign='center';ctxOut.fillText('Upload two face photos to see the morph',W/2,H/2)}}function wireDrop(which){const drop=$('drop'+which);const file=$('file'+which);drop.addEventListener('click',e=>{if(state[which].mode==='pan')file.click()});drop.addEventListener('dragover',e=>{e.preventDefault();drop.style.borderColor='#7c5cff'});drop.addEventListener('dragleave',e=>{drop.style.borderColor=''});drop.addEventListener('drop',e=>{e.preventDefault();drop.style.borderColor='';if(e.dataTransfer.files&&e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0],which)});file.addEventListener('change',e=>loadFile(e.target.files[0],which));const canvas=which==='A'?canvasA:canvasB;canvas.addEventListener('click',(e)=>{if(state[which].mode!=='eye')return;if(!state[which].img)return;const rect=canvas.getBoundingClientRect();const x=(e.clientX-rect.left)*(canvas.width/rect.width);const y=(e.clientY-rect.top)*(canvas.height/rect.height);if(state[which].eyes.length>=2)state[which].eyes=[];state[which].eyes.push({x,y});drawInput(which);if(state[which].eyes.length===2){state[which].mode='pan';$('mode'+which).textContent='pan'}drawOutput()},true)}wireDrop('A');wireDrop('B');$('alignA').addEventListener('click',()=>{state.A.mode='eye';state.A.eyes=[];$('modeA').textContent='click L eye';drawInput('A');drawOutput()});$('alignB').addEventListener('click',()=>{state.B.mode='eye';state.B.eyes=[];$('modeB').textContent='click L eye';drawInput('B');drawOutput()});$('clearA').addEventListener('click',()=>{state.A.eyes=[];state.A.mode='pan';$('modeA').textContent='pan';drawInput('A');drawOutput()});$('clearB').addEventListener('click',()=>{state.B.eyes=[];state.B.mode='pan';$('modeB').textContent='pan';drawInput('B');drawOutput()});$('swapFileA').addEventListener('click',()=>$('fileA').click());$('swapFileB').addEventListener('click',()=>$('fileB').click());$('blend').addEventListener('input',drawOutput);let playing=false,raf=0;$('play').addEventListener('click',()=>{if(playing){playing=false;cancelAnimationFrame(raf);$('play').textContent='Play morph';return}if(!state.A.img||!state.B.img){alert('Upload both images first.');return}playing=true;$('play').textContent='Stop';const dur=2400;const start=performance.now();function tick(now){if(!playing)return;const t=((now-start)%(dur*2))/dur;const v=t<=1?t:2-t;$('blend').value=Math.round(v*100);drawOutput();raf=requestAnimationFrame(tick)}raf=requestAnimationFrame(tick)});$('download').addEventListener('click',()=>{if(!state.A.img&&!state.B.img){alert('Upload images first.');return}const link=document.createElement('a');link.download='face-morph.png';link.href=out.toDataURL('image/png');link.click()});drawOutput()})();
+// âââ Globals ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+let raw1=null, raw2=null, orig1=null, orig2=null, slideA=null, slideB=null, apiReady=false;
+const MODEL='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.14/model';
+const PURPLE='#9c27b0';
+const SW=1920, SH=1080;
+
+// âââ Drop zones âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+function setupZone(zoneId,fileId,cardId,slot){
+  const z=document.getElementById(zoneId),f=document.getElementById(fileId),c=document.getElementById(cardId);
+  z.onclick=()=>f.click();
+  z.ondragover=e=>{e.preventDefault();z.classList.add('over');};
+  z.ondragleave=()=>z.classList.remove('over');
+  z.ondrop=e=>{e.preventDefault();z.classList.remove('over');if(e.dataTransfer.files[0])read(e.dataTransfer.files[0]);};
+  f.onchange=()=>{if(f.files[0])read(f.files[0]);};
+  function read(file){
+    const r=new FileReader();
+    r.onload=e=>{
+      const url=e.target.result;
+      if(slot===1)raw1=url;else raw2=url;
+      z.innerHTML='';
+      const img=document.createElement('img');img.src=url;z.appendChild(img);
+      c.classList.add('ok');
+      const el=new Image();el.src=url;
+      if(slot===1)orig1=el;else orig2=el;
+      checkReady();
+    };
+    r.readAsDataURL(file);
+  }
+}
+setupZone('zone1','file1','card1',1);
+setupZone('zone2','file2','card2',2);
+function checkReady(){document.getElementById('btnGen').disabled=!(raw1&&raw2);}
+
+// âââ face-api âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+async function loadApi(){
+  if(apiReady)return;
+  await Promise.all([
+    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL),
+    faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL),
+  ]);
+  apiReady=true;
+}
+async function getLandmarks(imgEl){
+  await new Promise(r=>{if(imgEl.complete&&imgEl.naturalWidth>0)r();else imgEl.onload=r;});
+  const opts=new faceapi.TinyFaceDetectorOptions({inputSize:416,scoreThreshold:0.3});
+  const res=await faceapi.detectSingleFace(imgEl,opts).withFaceLandmarks(true);
+  return res?res.landmarks:null;
+}
+
+// âââ Background removal âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+async function rembg(b64){
+  const r=await fetch('/api/fal-rembg',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64})});
+  const d=await r.json();
+  if(!r.ok||d.error)throw new Error(d.error||'Background removal failed');
+  return d.url;
+}
+function loadImg(src){
+  return new Promise((res,rej)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>res(i);i.onerror=rej;i.src=src;});
+}
+
+// âââ Eye alignment transform ââââââââââââââââââââââââââââââââââââââââââââââââââ
+function eyeCenter(pts){return{x:pts.reduce((s,p)=>s+p.x,0)/pts.length,y:pts.reduce((s,p)=>s+p.y,0)/pts.length};}
+function computeTransform(lm1,lm2){
+  const L1=eyeCenter(lm1.getLeftEye()),R1=eyeCenter(lm1.getRightEye());
+  const L2=eyeCenter(lm2.getLeftEye()),R2=eyeCenter(lm2.getRightEye());
+  const rot=Math.atan2(R1.y-L1.y,R1.x-L1.x)-Math.atan2(R2.y-L2.y,R2.x-L2.x);
+  const sc=Math.hypot(R1.x-L1.x,R1.y-L1.y)/Math.hypot(R2.x-L2.x,R2.y-L2.y);
+  const mid1={x:(L1.x+R1.x)/2,y:(L1.y+R1.y)/2};
+  const mid2={x:(L2.x+R2.x)/2,y:(L2.y+R2.y)/2};
+  const cos=Math.cos(rot),sin=Math.sin(rot);
+  return{sc,cos,sin,tx:mid1.x-sc*(mid2.x*cos-mid2.y*sin),ty:mid1.y-sc*(mid2.x*sin+mid2.y*cos)};
+}
+function alignFace(img,t,W,H){
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const ctx=c.getContext('2d');
+  ctx.setTransform(t.sc*t.cos,t.sc*t.sin,-t.sc*t.sin,t.sc*t.cos,t.tx,t.ty);
+  ctx.drawImage(img,0,0,img.naturalWidth,img.naturalHeight);
+  ctx.setTransform(1,0,0,1,0,0);
+  return c;
+}
+
+// âââ Feature-swap morph âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Left half = Face 1 (one eye + nose side)
+// Right half = Face 2 aligned (other eye + mouth)
+// Feathered vertical split at nose midline
+function buildFeatureSwap(cut1,cut2,lm1,transform,W,H){
+  // Align Face2 to Face1's coordinate space
+  const aligned2=alignFace(cut2,transform,W,H);
+
+  // Find nose midline X from Face1 landmarks (natural split point)
+  const nosePoints=lm1.getNose();
+  const splitX=Math.round(nosePoints.reduce((s,p)=>s+p.x,0)/nosePoints.length);
+  const blendHalf=36; // pixels of feather on each side of the split
+
+  // Get pixel data from both faces
+  const tmp1=document.createElement('canvas');tmp1.width=W;tmp1.height=H;
+  tmp1.getContext('2d').drawImage(cut1,0,0,W,H);
+  const d1=tmp1.getContext('2d').getImageData(0,0,W,H).data;
+  const d2=aligned2.getContext('2d').getImageData(0,0,W,H).data;
+
+  // Build composite pixel-by-pixel
+  const out=document.createElement('canvas');out.width=W;out.height=H;
+  const octx=out.getContext('2d');
+  const img=octx.createImageData(W,H);
+  const od=img.data;
+
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const i=(y*W+x)*4;
+      const a1=d1[i+3],a2=d2[i+3];
+
+      // Weight for Face1 (1=full Face1, 0=full Face2)
+      let w1;
+      if(x<=splitX-blendHalf) w1=1.0;
+      else if(x>=splitX+blendHalf) w1=0.0;
+      else{
+        // Smooth cosine blend in the transition zone
+        const t=(x-(splitX-blendHalf))/(blendHalf*2);
+        w1=0.5*(1+Math.cos(t*Math.PI));
+      }
+      const w2=1-w1;
+
+      const hasF1=a1>0,hasF2=a2>0;
+      if(!hasF1&&!hasF2) continue; // fully transparent
+
+      let r,g,b,a;
+      if(hasF1&&hasF2){
+        // Both present: blend RGB and use the stronger alpha side
+        r=Math.round(d1[i]*w1+d2[i]*w2);
+        g=Math.round(d1[i+1]*w1+d2[i+1]*w2);
+        b=Math.round(d1[i+2]*w1+d2[i+2]*w2);
+        a=Math.round(a1*w1+a2*w2);
+      } else if(hasF1){
+        r=d1[i];g=d1[i+1];b=d1[i+2];a=Math.round(a1*w1);
+      } else {
+        r=d2[i];g=d2[i+1];b=d2[i+2];a=Math.round(a2*w2);
+      }
+      od[i]=r;od[i+1]=g;od[i+2]=b;od[i+3]=a;
+    }
+  }
+  octx.putImageData(img,0,0);
+  return out;
+}
+
+// âââ Sticker: white border + drop shadow on transparent PNG ââââââââââââââââââ
+function sticker(src,border=15){
+  const sW=src.width,sH=src.height,pad=border+40;
+  const W=sW+pad*2,H=sH+pad*2;
+  // White silhouette
+  const sil=document.createElement('canvas');sil.width=sW;sil.height=sH;
+  const sx=sil.getContext('2d');
+  sx.drawImage(src,0,0,sW,sH);
+  sx.globalCompositeOperation='source-in';
+  sx.fillStyle='white';sx.fillRect(0,0,sW,sH);
+  // Stamp at 36 angles to create thick white outline
+  const brd=document.createElement('canvas');brd.width=W;brd.height=H;
+  const bx=brd.getContext('2d');
+  for(let i=0;i<36;i++){
+    const a=(i/36)*Math.PI*2;
+    bx.drawImage(sil,pad+Math.cos(a)*border,pad+Math.sin(a)*border);
+  }
+  bx.drawImage(src,pad,pad,sW,sH);
+  // Drop shadow
+  const fin=document.createElement('canvas');fin.width=W;fin.height=H;
+  const fx=fin.getContext('2d');
+  fx.shadowColor='rgba(0,0,0,0.55)';
+  fx.shadowBlur=24;fx.shadowOffsetX=10;fx.shadowOffsetY=16;
+  fx.drawImage(brd,0,0);
+  return fin;
+}
+
+// âââ Slides âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+function drawBg(ctx){
+  ctx.fillStyle='#f7f7f7';ctx.fillRect(0,0,SW,SH);
+  ctx.strokeStyle='rgba(180,180,180,0.2)';ctx.lineWidth=1;
+  for(let x=0;x<=SW;x+=48){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,SH);ctx.stroke();}
+  for(let y=0;y<=SH;y+=48){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(SW,y);ctx.stroke();}
+}
+function fit(sw,sh,mw,mh){const s=Math.min(mw/sw,mh/sh,1);return{w:Math.round(sw*s),h:Math.round(sh*s)};}
+function rr(ctx,x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();
+}
+
+function makeSlideA(stkMorph){
+  const c=document.createElement('canvas');c.width=SW;c.height=SH;
+  const ctx=c.getContext('2d');
+  drawBg(ctx);
+  ctx.font='bold 84px "Bowlby One SC",cursive';
+  ctx.fillStyle=PURPLE;ctx.textAlign='center';ctx.textBaseline='top';
+  ctx.fillText('Facemorph.',SW/2,42);
+  const{w,h}=fit(stkMorph.width,stkMorph.height,940,870);
+  ctx.drawImage(stkMorph,(SW-w)/2,140+(870-h)/2,w,h);
+  return c;
+}
+
+function makeSlideB(stk1,stkM,stk2,n1,n2){
+  const c=document.createElement('canvas');c.width=SW;c.height=SH;
+  const ctx=c.getContext('2d');
+  drawBg(ctx);
+  ctx.font='bold 84px "Bowlby One SC",cursive';
+  ctx.fillStyle=PURPLE;ctx.textAlign='center';ctx.textBaseline='top';
+  ctx.fillText('Facemorph.',SW/2,42);
+  const slots=[{x:24,w:574},{x:658,w:604},{x:1322,w:574}];
+  [stk1,stkM,stk2].forEach((f,i)=>{
+    const{w,h}=fit(f.width,f.height,slots[i].w,748);
+    ctx.drawImage(f,slots[i].x+(slots[i].w-w)/2,146+(748-h)/2,w,h);
+  });
+  const ans=(n1||'Person 1')+' & '+(n2||'Person 2');
+  ctx.font='bold 44px "Bowlby One SC",cursive';ctx.textBaseline='middle';
+  const tw=ctx.measureText(ans).width,bw=tw+70,bh=68,bx=(SW-bw)/2,by=936;
+  ctx.save();ctx.shadowColor='rgba(0,0,0,0.1)';ctx.shadowBlur=8;ctx.shadowOffsetY=3;
+  ctx.fillStyle='#fff';ctx.strokeStyle=PURPLE;ctx.lineWidth=3;rr(ctx,bx,by,bw,bh,10);ctx.fill();ctx.stroke();ctx.restore();
+  ctx.fillStyle=PURPLE;ctx.textAlign='center';ctx.fillText(ans,SW/2,by+bh/2);
+  return c;
+}
+
+// âââ Progress âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+function prog(pct,title,msg,err){
+  document.getElementById('progBox').classList.add('on');
+  document.getElementById('progFill').style.width=pct+'%';
+  if(title!==undefined)document.getElementById('progTitle').textContent=title;
+  if(msg!==undefined)document.getElementById('progMsg').textContent=msg;
+  document.getElementById('errMsg').textContent=err||'';
+}
+
+// âââ Generate âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+document.getElementById('btnGen').addEventListener('click',async()=>{
+  document.getElementById('btnGen').disabled=true;
+  document.getElementById('previewBox').classList.remove('on');
+  document.getElementById('errMsg').textContent='';
+  slideA=null;slideB=null;
+  try{
+    prog(5,'Loading face landmark modelâ¦','');
+    await loadApi();
+
+    prog(14,'Detecting landmarks & removing backgroundsâ¦','Running in parallelâ¦');
+    const[[lm1,lm2],[url1,url2]]=await Promise.all([
+      Promise.all([getLandmarks(orig1),getLandmarks(orig2)]),
+      Promise.all([rembg(raw1),rembg(raw2)]),
+    ]);
+    if(!lm1||!lm2) throw new Error('Face not detected in one or both photos. Use a clear forward-facing headshot.');
+
+    prog(56,'Loading cutoutsâ¦','');
+    const[cut1,cut2]=await Promise.all([loadImg(url1),loadImg(url2)]);
+
+    prog(65,'Aligning facesâ¦','Matching eye positionsâ¦');
+    const W=cut1.naturalWidth,H=cut1.naturalHeight;
+    const transform=computeTransform(lm1,lm2);
+
+    prog(74,'Building feature swapâ¦','Left eye+nose from Face 1 | Right eye+mouth from Face 2â¦');
+    const morphC=buildFeatureSwap(cut1,cut2,lm1,transform,W,H);
+
+    prog(86,'Applying white border & drop shadowâ¦','');
+    const c1c=document.createElement('canvas');c1c.width=W;c1c.height=H;c1c.getContext('2d').drawImage(cut1,0,0);
+    const c2c=document.createElement('canvas');c2c.width=cut2.naturalWidth;c2c.height=cut2.naturalHeight;c2c.getContext('2d').drawImage(cut2,0,0);
+    const sM=sticker(morphC,16),s1=sticker(c1c,12),s2=sticker(c2c,12);
+
+    prog(94,'Rendering 1920Ã1080 slidesâ¦','');
+    const n1=document.getElementById('name1').value.trim();
+    const n2=document.getElementById('name2').value.trim();
+    slideA=makeSlideA(sM);
+    slideB=makeSlideB(s1,sM,s2,n1,n2);
+
+    prog(100,'Done! â','Both slides ready.');
+    showSlide('A');
+    document.getElementById('previewBox').classList.add('on');
+  }catch(e){
+    console.error(e);
+    prog(0,'Error','',e.message||String(e));
+  }finally{
+    document.getElementById('btnGen').disabled=false;
+  }
+});
+
+function showSlide(w){
+  const src=w==='A'?slideA:slideB;if(!src)return;
+  document.getElementById('tabA').classList.toggle('on',w==='A');
+  document.getElementById('tabB').classList.toggle('on',w==='B');
+  const cv=document.getElementById('cv');cv.width=src.width;cv.height=src.height;
+  cv.getContext('2d').drawImage(src,0,0);
+}
+function dl(w){
+  const src=w==='A'?slideA:slideB;if(!src)return;
+  const n1=document.getElementById('name1').value.trim()||'Face1';
+  const n2=document.getElementById('name2').value.trim()||'Face2';
+  const a=document.createElement('a');a.href=src.toDataURL('image/png');
+  a.download='FaceMorph_'+w+'_'+n1+'_'+n2+'.png';a.click();
+}
+async function generateMorphHint(){
+  const c1=document.getElementById('name1').value.trim(),c2=document.getElementById('name2').value.trim();
+  if(!c1||!c2){alert('Enter both names first!');return;}
+  const btn=document.getElementById('aiMorphHintBtn'),panel=document.getElementById('aiMorphPanel');
+  btn.disabled=true;btn.textContent='â³ Writing clue...';
+  try{
+    const res=await fetch('/api/ai-text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'face-morph-hint',celeb1:c1,celeb2:c2})});
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    panel.textContent='"'+data.result+'"';panel.style.display='block';
+  }catch(err){alert('AI error: '+err.message);}
+  finally{btn.disabled=false;btn.textContent='ð¤ AI Generate Host Clue';}
+}
 </script>
 </body>
 </html>
