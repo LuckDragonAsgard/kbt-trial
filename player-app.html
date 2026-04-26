@@ -2315,11 +2315,15 @@
                     headers: { ...KBT_SB_H, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
                     body: JSON.stringify(payload)
                 });
-                if (status) status.innerHTML = r.ok
-                    ? `<span style="color:#00c875;font-weight:600">✓ Answer submitted!</span>`
-                    : `<span style="color:#e74c3c">Error ${r.status} — try again</span>`;
-                if (r.ok) { _submittedQ = pushedAt; playSound('ding'); }
-                else { _submittedQ = null; }
+                if (r.ok || r.status === 409) {
+                    // 409 = already submitted (duplicate) — treat as success
+                    if (status) status.innerHTML = `<span style="color:#00c875;font-weight:600">✓ Answer submitted!</span>`;
+                    _submittedQ = pushedAt;
+                    if (r.ok) playSound('ding');
+                } else {
+                    if (status) status.innerHTML = `<span style="color:#e74c3c">Error ${r.status} — try again</span>`;
+                    _submittedQ = null;
+                }
             } catch(e) {
                 if (status) status.innerHTML = `<span style="color:#e74c3c">Network error — tap an option to retry</span>`;
                 _submittedQ = null;
