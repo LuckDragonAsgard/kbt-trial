@@ -1480,7 +1480,7 @@
             <div class="modal-title">Welcome Back! 🔑</div>
             <div class="input-group">
                 <label class="input-label">Enter Your Team Code</label>
-                <input type="text" id="loginCode" placeholder="e.g., BRAINS24" style="text-transform: uppercase;" onkeydown="if(event.key==='Enter')handleLogin()">
+                <input type="text" id="loginCode" placeholder="Enter your team code" style="text-transform: uppercase;" onkeydown="if(event.key==='Enter')handleLogin()">
                 <div id="loginError" style="color:#ff3860;font-size:0.85rem;margin-top:0.4rem;display:none;"></div>
             </div>
             <button class="btn btn-primary btn-block" onclick="handleLogin()">Enter Team</button>
@@ -1806,30 +1806,54 @@
             document.getElementById('loginModal').classList.remove('active');
         }
 
-        function handleLogin() {
+        async function handleLogin() {
             const code = document.getElementById('loginCode').value.toUpperCase().trim();
             const errorEl = document.getElementById('loginError');
             const inputEl = document.getElementById('loginCode');
             if (!code) {
-                errorEl.textContent = 'Please enter a team code';
+                errorEl.textContent = 'Please enter your team code';
                 errorEl.style.display = 'block';
                 inputEl.style.borderColor = '#ff3860';
                 return;
             }
-            const team = mockTeams.find(t => t.code === code);
-            if (team) {
-                errorEl.style.display = 'none';
-                inputEl.style.borderColor = '';
-                appState.currentTeam = { ...team };
-                appState.currentUser = { name: 'Captain', avatar: '🧠' };
-                closeLoginModal();
-                showApp();
-                playSound('chime');
-            } else {
-                errorEl.textContent = 'Team code not found. Try BRAINS24, QUEENS22, or TITANS19';
+            errorEl.style.display = 'none';
+            inputEl.disabled = true;
+            try {
+                const resp = await fetch(
+                    KBT_SB_URL + '/kbt_teams?team_name=eq.' + encodeURIComponent(code) + '&limit=1',
+                    { headers: KBT_SB_H }
+                );
+                const rows = resp.ok ? await resp.json() : [];
+                if (rows.length > 0) {
+                    const t = rows[0];
+                    inputEl.disabled = false;
+                    inputEl.style.borderColor = '';
+                    appState.currentTeam = {
+                        id: t.id,
+                        name: t.display_name || t.team_name,
+                        team_name: t.team_name,
+                        code: t.team_name,
+                        eventCode: t.event_code,
+                        color: t.team_color || 'purple',
+                        mascot: t.team_emoji || '🧠',
+                        score: t.score || 0,
+                        members: 4
+                    };
+                    appState.currentUser = { name: 'Captain', avatar: t.team_emoji || '🧠' };
+                    closeLoginModal();
+                    showApp();
+                    playSound('chime');
+                } else {
+                    inputEl.disabled = false;
+                    errorEl.textContent = 'Team code not found. Check your code and try again.';
+                    errorEl.style.display = 'block';
+                    inputEl.style.borderColor = '#ff3860';
+                    inputEl.select();
+                }
+            } catch(e) {
+                inputEl.disabled = false;
+                errorEl.textContent = 'Login failed — check connection and try again.';
                 errorEl.style.display = 'block';
-                inputEl.style.borderColor = '#ff3860';
-                inputEl.select();
             }
         }
 
@@ -3463,7 +3487,7 @@
             <div class="modal-title">Welcome Back! 🔑</div>
             <div class="input-group">
                 <label class="input-label">Enter Your Team Code</label>
-                <input type="text" id="loginCode" placeholder="e.g., BRAINS24" style="text-transform: uppercase;" onkeydown="if(event.key==='Enter')handleLogin()">
+                <input type="text" id="loginCode" placeholder="Enter your team code" style="text-transform: uppercase;" onkeydown="if(event.key==='Enter')handleLogin()">
                 <div id="loginError" style="color:#ff3860;font-size:0.85rem;margin-top:0.4rem;display:none;"></div>
             </div>
             <button class="btn btn-primary btn-block" onclick="handleLogin()">Enter Team</button>
