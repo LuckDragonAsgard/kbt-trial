@@ -118,7 +118,14 @@
         event_id: 'eq.' + eventId
       });
     },
-    async getRoundScores(code){ return (getMode()==='live'?live:offline).getRoundScores(code); },
+    // FIX: was a recursive delegator — now queries trial_scores directly
+    async getRoundScores(code){
+      return pgGet('trial_scores', {
+        select: 'team_name,round,points',
+        event_code: 'eq.' + (code || TARGET_EVENT_CODE),
+        question_number: 'eq.0'
+      });
+    },
     async submitRoundScore(eventCode, teamName, round, points){
       const rows = await pgPost(
         'trial_scores',
@@ -179,6 +186,8 @@
       return entry;
     },
     async getAnswersForEvent(){ return []; },
+    // FIX: was missing from offline object entirely — added to prevent crash
+    async getRoundScores(code){ return []; },
     async submitRoundScore(eventCode, teamName, round, points){
       let scores = {};
       try { scores = JSON.parse(localStorage.getItem('kbtScores') || '{}'); } catch(e){}
