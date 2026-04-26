@@ -1661,6 +1661,13 @@
             powerupsUsed: {}
         };
 
+        // ── Supabase for live quiz ───────────────────────────────────────────
+        const KBT_SB_URL = 'https://huvfgenbcaiicatvtxak.supabase.co/rest/v1';
+        const KBT_SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1dmZnZW5iY2FpaWNhdHZ0eGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MTczNjIsImV4cCI6MjA5MTE5MzM2Mn0.uTgzTKYjJnkFlRUIhGfW4ODKyV24xOdKaX7lxpDuMfc';
+        const KBT_SB_H = {'apikey': KBT_SB_KEY, 'Authorization': 'Bearer ' + KBT_SB_KEY};
+        const KBT_WORKER_URL = 'https://kbt-admin.pgallivan.workers.dev';
+
+
         const colors = {
             purple: '#2C94C2',
             gold: '#E8A317',
@@ -1976,8 +1983,10 @@
                     html = renderWrapped();
                     break;
             }
+            stopQuizPolling();
             document.getElementById('contentArea').innerHTML = html;
             if (tabName === 'quiz') {
+                startQuizPolling();
                 setTimeout(() => {
                     document.querySelectorAll('.answer-option').forEach(el => {
                         el.addEventListener('click', function() {
@@ -2161,41 +2170,159 @@
             showToast('Team motto updated! ✍️');
         }
 
+
         function renderQuiz() {
-            const powerups = [
-                { emoji: '🔥', name: 'DOUBLE POINTS', desc: 'Double this question' },
-                { emoji: '5️⃣0️⃣', name: '50/50', desc: 'Remove 2 wrong answers' },
-                { emoji: '⏰', name: 'EXTRA TIME', desc: '+30 seconds' }
-            ];
-
-            return `
-                <div class="quiz-container">
-                    <div class="quiz-header">
-                        <div style="font-size: 0.9rem; opacity: 0.9;">Question 7 of 10</div>
-                        <div class="quiz-timer" id="quizTimer">45s</div>
-                        <div style="font-size: 0.9rem; opacity: 0.9;">Current Score: 420</div>
+            const ec = (window.kbtData && window.kbtData.TARGET_EVENT_CODE) || appState.currentTeam?.eventCode || '';
+            return `<div id="quiz-live-container" data-event="${ec}">
+                <div style="padding:1.5rem;text-align:center;color:var(--navy)">
+                    <div class="quiz-timer" id="quizTimer" style="display:inline-block;margin-bottom:1rem">⏳</div>
+                    <div id="quiz-live-content" style="font-size:1.1rem;color:var(--navy)">
+                        <div style="font-size:2rem;margin-bottom:0.5rem">🎯</div>
+                        <div style="font-weight:600;margin-bottom:0.5rem">Waiting for next question…</div>
+                        <div style="font-size:0.85rem;opacity:0.6">Your host will push questions to this screen during the quiz.</div>
                     </div>
-
-                    <div class="powerup-bar">
-                        ${powerups.map((p, i) => `
-                            <div class="powerup ${appState.powerupsUsed[i] ? 'used' : ''}" onclick="usePowerup(${i})">
-                                <span class="powerup-emoji">${p.emoji}</span>
-                                <div class="powerup-name">${p.name}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-
-                    <div class="quiz-question">
-                        <div class="question-text">What is the capital of France?</div>
-                        <div class="answer-option">Paris</div>
-                        <div class="answer-option">London</div>
-                        <div class="answer-option">Berlin</div>
-                        <div class="answer-option">Madrid</div>
-                    </div>
-
-                    <button class="btn btn-primary btn-block" style="margin: 1rem;">Submit Answer</button>
+                    <div id="quiz-answer-status" style="margin-top:1rem;font-size:0.9rem"></div>
                 </div>
-            `;
+            </div>`;
+        }
+
+        // ── Live quiz polling ─────────────────────────────────────────────────
+        let _quizPollInterval = null;
+        let _lastQPushedAt = null;
+        let _quizTimerInt = null;
+        let _submittedQ = null; // pushedAt of last submitted answer
+
+        function startQuizPolling() {
+            stopQuizPolling();
+            pollQuestion();
+            _quizPollInterval = setInterval(pollQuestion, 2000);
+        }
+
+        function stopQuizPolling() {
+            if (_quizPollInterval) { clearInterval(_quizPollInterval); _quizPollInterval = null; }
+            if (_quizTimerInt) { clearInterval(_quizTimerInt); _quizTimerInt = null; }
+        }
+
+        async function pollQuestion() {
+            const container = document.getElementById('quiz-live-container');
+            if (!container) { stopQuizPolling(); return; }
+            const ec = container.dataset.event;
+            if (!ec) return;
+            let q = null;
+            try {
+                const r = await fetch(`${KBT_WORKER_URL}/api/question?event_code=${encodeURIComponent(ec)}`);
+                if (r.ok) q = await r.json();
+            } catch(e) { return; }
+
+            if (!q || !q.question) {
+                // No active question — show waiting
+                if (_lastQPushedAt !== null) {
+                    _lastQPushedAt = null;
+                    _submittedQ = null;
+                    stopQuizTimer();
+                    const content = document.getElementById('quiz-live-content');
+                    if (content) content.innerHTML = `
+                        <div style="font-size:2rem;margin-bottom:0.5rem">🎯</div>
+                        <div style="font-weight:600;margin-bottom:0.5rem">Waiting for next question…</div>
+                        <div style="font-size:0.85rem;opacity:0.6">Your host will push questions to this screen during the quiz.</div>`;
+                    const timer = document.getElementById('quizTimer');
+                    if (timer) timer.style.display = 'none';
+                    const status = document.getElementById('quiz-answer-status');
+                    if (status) status.textContent = '';
+                }
+                return;
+            }
+
+            // New question arrived?
+            if (q.pushedAt !== _lastQPushedAt) {
+                _lastQPushedAt = q.pushedAt;
+                _submittedQ = null;
+                renderLiveQuestion(q);
+            }
+        }
+
+        function renderLiveQuestion(q) {
+            const content = document.getElementById('quiz-live-content');
+            const timer   = document.getElementById('quizTimer');
+            const status  = document.getElementById('quiz-answer-status');
+            if (!content) return;
+            const opts = [
+                {key:'A', val:q.optionA}, {key:'B', val:q.optionB},
+                {key:'C', val:q.optionC}, {key:'D', val:q.optionD}
+            ].filter(o => o.val);
+            content.innerHTML = `
+                <div style="font-size:0.8rem;font-weight:600;color:var(--muted);margin-bottom:0.5rem">
+                    ${q.round ? q.round + ' · ' : ''}Question ${q.questionNum||''}
+                </div>
+                <div class="quiz-question" style="font-size:1.15rem;font-weight:700;margin-bottom:1rem;color:var(--navy)">${q.question}</div>
+                ${opts.length ? `<div style="display:grid;gap:0.6rem;margin-top:0.5rem">
+                    ${opts.map(o=>`<button class="answer-option" id="quiz-opt-${o.key}"
+                        style="padding:0.9rem 1rem;border-radius:10px;border:2px solid #e0e7ff;background:var(--white,#fff);font-size:1rem;cursor:pointer;text-align:left;transition:all .2s;color:var(--navy)"
+                        onclick="selectLiveAnswer('${o.key}','${q.pushedAt}')"
+                    ><span style="font-weight:700;margin-right:0.5rem">${o.key}.</span> ${o.val}</button>`).join('')}
+                </div>` : ''}`;
+            if (timer) { timer.style.display='inline-block'; startQuizTimer(q.timeLimit||60); }
+            if (status) status.textContent = '';
+        }
+
+        function selectLiveAnswer(optKey, pushedAt) {
+            if (_submittedQ === pushedAt) return; // already submitted
+            document.querySelectorAll('.answer-option').forEach(el => {
+                el.style.background = 'var(--white,#fff)';
+                el.style.borderColor = '#e0e7ff';
+            });
+            const chosen = document.getElementById(`quiz-opt-${optKey}`);
+            if (chosen) { chosen.style.background='#e8f4fd'; chosen.style.borderColor='#2C94C2'; }
+            submitLiveAnswer(optKey, pushedAt);
+        }
+
+        async function submitLiveAnswer(optKey, pushedAt) {
+            _submittedQ = pushedAt;
+            const status = document.getElementById('quiz-answer-status');
+            if (status) status.textContent = 'Submitting…';
+            const teamName = appState.currentTeam?.name || appState.currentTeam?.team_name || 'Unknown';
+            const ec = document.getElementById('quiz-live-container')?.dataset?.event || '';
+            const payload = {
+                event_code: ec,
+                team_name: teamName,
+                question_pushed_at: pushedAt,
+                selected_option: optKey,
+                submitted_at: new Date().toISOString()
+            };
+            try {
+                const r = await fetch(`${KBT_SB_URL}/answers`, {
+                    method: 'POST',
+                    headers: { ...KBT_SB_H, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+                    body: JSON.stringify(payload)
+                });
+                if (status) status.innerHTML = r.ok
+                    ? `<span style="color:#00c875;font-weight:600">✓ Answer submitted!</span>`
+                    : `<span style="color:#e74c3c">Error ${r.status} — try again</span>`;
+                if (r.ok) { _submittedQ = pushedAt; playSound('ding'); }
+                else { _submittedQ = null; }
+            } catch(e) {
+                if (status) status.innerHTML = `<span style="color:#e74c3c">Network error — tap an option to retry</span>`;
+                _submittedQ = null;
+            }
+        }
+
+        function startQuizTimer(secs) {
+            stopQuizTimer();
+            let remaining = secs;
+            const timer = document.getElementById('quizTimer');
+            if (timer) timer.textContent = remaining + 's';
+            _quizTimerInt = setInterval(() => {
+                remaining--;
+                if (timer) timer.textContent = remaining + 's';
+                if (remaining <= 0) {
+                    stopQuizTimer();
+                    if (timer) timer.textContent = "Time's up!";
+                }
+            }, 1000);
+        }
+
+        function stopQuizTimer() {
+            if (_quizTimerInt) { clearInterval(_quizTimerInt); _quizTimerInt = null; }
         }
 
         function usePowerup(index) {
@@ -3505,859 +3632,5 @@
     <!-- VENUE DETAILS POPUP (for map) -->
     <div id="venuePopup" class="venue-popup" style="display:none;"></div>
 
-    <script>
-        // App State
-        const appState = {
-            currentUser: null,
-            currentTeam: null,
-            darkMode: localStorage.getItem('darkMode') === 'true',
-            soundEnabled: localStorage.getItem('soundEnabled') !== 'false',
-            currentTab: 'home',
-            captainToggle: false,
-            powerupsUsed: {}
-        };
-
-        const colors = {
-            purple: '#2C94C2',
-            gold: '#E8A317',
-            red: '#ff3860',
-            blue: '#00d4ff',
-            green: '#00d084',
-            teal: '#1dd1a1',
-            pink: '#ff006e',
-            orange: '#ff9500'
-        };
-
-        const venues = [
-            { name: 'The Steam Packet', day: 'Monday', address: '293 Toorak Rd, Hawthorn', lat: 35, lng: 50 },
-            { name: 'Fawkner Bar', day: 'Tuesday', address: '175 Chapel St, Prahran', lat: 55, lng: 45 },
-            { name: 'The Sporting Globe', day: 'Wednesday', address: '177 Bay St, Brighton', lat: 45, lng: 65 },
-            { name: 'Meat & Wine Co', day: 'Thursday', address: '50 Waratah Ave, Rushcutters Bay', lat: 60, lng: 55 },
-            { name: 'Bar Americano', day: 'Saturday', address: '16 Hardware Ln, Melbourne', lat: 50, lng: 40 }
-        ];
-
-        // Mock Data
-        const mockTeams = [
-            { id: 1, name: 'The Know-It-Alls', code: 'BRAINS24', captain: 'Alex', members: 4, score: 4850, color: 'purple', mascot: '🧠', motto: 'Brain power wins!' },
-            { id: 2, name: 'Quiz Queens', code: 'QUEENS22', captain: 'Sarah', members: 5, score: 4720, color: 'pink', mascot: '👑', motto: 'All hail the brain' },
-            { id: 3, name: 'Trivia Titans', code: 'TITANS19', captain: 'Mike', members: 4, score: 4680, color: 'gold', mascot: '🦁', motto: 'Roar to victory!' }
-        ];
-
-        const mockLeagues = [
-            { rank: 1, team: 'The Know-It-Alls', score: 4850, wins: 24, played: 28, accuracy: '89%' },
-            { rank: 2, team: 'Quiz Queens', score: 4720, wins: 22, played: 26, accuracy: '86%' },
-            { rank: 3, team: 'Trivia Titans', score: 4680, wins: 21, played: 25, accuracy: '85%' },
-            { rank: 4, team: 'Brain Busters', score: 4500, wins: 20, played: 24, accuracy: '84%' },
-            { rank: 5, team: 'Quiz Zealots', score: 4320, wins: 18, played: 22, accuracy: '82%' }
-        ];
-
-        const mockBadges = [
-            { id: 1, name: 'On Fire', emoji: '🔥', desc: 'Won 5 in a row', earned: true },
-            { id: 2, name: 'Speed Demon', emoji: '⚡', desc: 'Answered 10 in a row under 5s', earned: true },
-            { id: 3, name: 'Brain Genius', emoji: '🧠', desc: '95%+ accuracy', earned: true },
-            { id: 4, name: 'Team Player', emoji: '🤝', desc: 'Played 50 games', earned: false },
-            { id: 5, name: 'Trophy Collector', emoji: '🏆', desc: 'Won 25 games', earned: false },
-            { id: 6, name: 'Streak Master', emoji: '⭐', desc: 'Won 10 in a row', earned: false },
-            { id: 7, name: 'Speedster', emoji: '🚀', desc: 'Fastest team average', earned: true },
-            { id: 8, name: 'All-Star', emoji: '💫', desc: 'Top 3 in league', earned: true }
-        ];
-
-        const seasonAwards = [
-            { title: 'Season Champion', icon: '🏆', winner: 'The Know-It-Alls', stat: '4850 points', comment: 'Absolutely dominated this season!' },
-            { title: 'MVP', icon: '🌟', winner: 'Alex Johnson', stat: '412 correct answers', comment: 'The brain behind the team' },
-            { title: 'Hottest Streak', icon: '🔥', winner: 'Sarah Chen', stat: '21 game win streak', comment: 'On absolute fire!' },
-            { title: 'Most Dedicated', icon: '📅', winner: 'Mike Torres', stat: '47 games played', comment: 'Never missed a night!' },
-            { title: 'Gambler of the Year', icon: '🎰', winner: 'Emma Wilson', stat: '94% wager accuracy', comment: 'Risk-taker with rewards!' },
-            { title: 'Brain of the Year', icon: '🧠', winner: 'James Lee', stat: '92% avg score', comment: 'Pure intelligence!' },
-            { title: 'Social Butterfly', icon: '🦋', winner: 'Olivia Smith', stat: 'Played with 9 teams', comment: 'The connector!' },
-            { title: 'Most Improved', icon: '📈', winner: 'David Brown', stat: '+850 rating', comment: 'Came out of nowhere!' },
-            { title: 'Pub Crawler', icon: '🍺', winner: 'Sophie Jones', stat: '15 venues visited', comment: 'Knows the trivia circuit!' },
-            { title: 'Captain Fantastic', icon: '👑', winner: 'Alex Johnson', stat: '24-4 record as captain', comment: 'Born to lead!' }
-        ];
-
-        // Initialize
-        window.addEventListener('DOMContentLoaded', () => {
-            if (appState.darkMode) {
-                document.documentElement.classList.add('dark-mode');
-                document.getElementById('darkModeToggle').classList.add('active');
-                document.getElementById('themeIcon').textContent = '☀️';
-            }
-            if (appState.soundEnabled) {
-                document.getElementById('soundToggle').classList.add('active');
-            }
-        });
-
-        // Theme Toggle
-        function toggleTheme() {
-            appState.darkMode = !appState.darkMode;
-            localStorage.setItem('darkMode', appState.darkMode);
-            document.documentElement.classList.toggle('dark-mode');
-            document.getElementById('darkModeToggle').classList.toggle('active');
-            document.getElementById('themeIcon').textContent = appState.darkMode ? '☀️' : '🌙';
-            playSound('chime');
-        }
-
-        // Sound System
-        function toggleSound() {
-            appState.soundEnabled = !appState.soundEnabled;
-            localStorage.setItem('soundEnabled', appState.soundEnabled);
-            document.getElementById('soundToggle').classList.toggle('active');
-            if (appState.soundEnabled) {
-                playSound('chime');
-            }
-        }
-
-        function playSound(type) {
-            if (!appState.soundEnabled) return;
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-
-            switch(type) {
-                case 'chime':
-                    oscillator.frequency.value = 1000;
-                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                    oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 0.5);
-                    break;
-                case 'ding':
-                    oscillator.frequency.value = 1200;
-                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                    oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 0.3);
-                    break;
-                case 'whoosh':
-                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
-                    oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.2);
-                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-                    oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 0.2);
-                    break;
-            }
-        }
-
-        // Login/Registration
-        function showLoginModal() {
-            document.getElementById('loginModal').classList.add('active');
-            const input = document.getElementById('loginCode');
-            input.value = '';
-            input.style.borderColor = '';
-            document.getElementById('loginError').style.display = 'none';
-            setTimeout(() => input.focus(), 100);
-        }
-
-        function closeLoginModal() {
-            document.getElementById('loginModal').classList.remove('active');
-        }
-
-        function handleLogin() {
-            const code = document.getElementById('loginCode').value.toUpperCase().trim();
-            const errorEl = document.getElementById('loginError');
-            const inputEl = document.getElementById('loginCode');
-            if (!code) {
-                errorEl.textContent = 'Please enter a team code';
-                errorEl.style.display = 'block';
-                inputEl.style.borderColor = '#ff3860';
-                return;
-            }
-            const team = mockTeams.find(t => t.code === code);
-            if (team) {
-                errorEl.style.display = 'none';
-                inputEl.style.borderColor = '';
-                appState.currentTeam = { ...team };
-                appState.currentUser = { name: 'Captain', avatar: '🧠' };
-                closeLoginModal();
-                showApp();
-                playSound('chime');
-            } else {
-                errorEl.textContent = 'Team code not found. Try BRAINS24, QUEENS22, or TITANS19';
-                errorEl.style.display = 'block';
-                inputEl.style.borderColor = '#ff3860';
-                inputEl.select();
-            }
-        }
-
-        function showRegistrationFlow() {
-            document.getElementById('registrationModal').classList.add('active');
-            document.getElementById('regStep1').style.display = 'block';
-            document.getElementById('regStep2').style.display = 'none';
-            document.getElementById('regStep3').style.display = 'none';
-        }
-
-        function closeRegistrationModal() {
-            document.getElementById('registrationModal').classList.remove('active');
-        }
-
-        let tempTeamData = {};
-        let selectedAvatar = '🧠';
-
-        function selectAvatar(element, emoji) {
-            document.querySelectorAll('#regStep1 .avatar-option').forEach(el => el.classList.remove('selected'));
-            element.classList.add('selected');
-            selectedAvatar = emoji;
-        }
-
-        function proceedToStep2() {
-            tempTeamData.name = document.getElementById('teamName').value || 'New Team';
-            tempTeamData.playerName = document.getElementById('playerName').value || 'Player';
-            tempTeamData.avatar = selectedAvatar;
-            document.getElementById('regStep1').style.display = 'none';
-            document.getElementById('regStep2').style.display = 'block';
-        }
-
-        function backToStep1() {
-            document.getElementById('regStep2').style.display = 'none';
-            document.getElementById('regStep1').style.display = 'block';
-        }
-
-        let selectedColor = 'purple';
-        let selectedMascot = '🧠';
-
-        function selectTeamColor(element, color) {
-            document.querySelectorAll('#regStep2 .color-option').forEach(el => el.classList.remove('selected'));
-            element.classList.add('selected');
-            selectedColor = color;
-        }
-
-        function selectTeamMascot(element, emoji) {
-            document.querySelectorAll('#regStep2 .mascot-option').forEach(el => el.classList.remove('selected'));
-            element.classList.add('selected');
-            selectedMascot = emoji;
-        }
-
-        async function completeRegistration() {
-            tempTeamData.color = selectedColor;
-            tempTeamData.mascot = selectedMascot;
-            tempTeamData.motto = document.getElementById('teamMotto').value || '';
-            tempTeamData.code = generateTeamCode();
-            tempTeamData.score = 0;
-            tempTeamData.captain = tempTeamData.playerName;
-            tempTeamData.members = 1;
-
-            document.getElementById('regStep2').style.display = 'none';
-            document.getElementById('regStep3').style.display = 'block';
-            document.getElementById('generatedCode').textContent = tempTeamData.name;
-
-            appState.currentTeam = tempTeamData;
-            appState.currentUser = { name: tempTeamData.playerName, avatar: selectedAvatar };
-            playSound('ding');
-
-            // Write registration to Supabase
-            if (window.kbtData) {
-                try {
-                    await window.kbtData.registerTeam(
-                        window.kbtData.TARGET_EVENT_CODE,
-                        tempTeamData.name,
-                        tempTeamData.playerName,
-                        tempTeamData.color,
-                        tempTeamData.mascot
-                    );
-                    console.log('[kbt] Team registered in Supabase:', tempTeamData.name);
-                } catch(e) {
-                    console.warn('[kbt] Could not write registration to Supabase:', e.message);
-                }
-            }
-        }
-
-        function generateTeamCode() {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let code = '';
-            for (let i = 0; i < 8; i++) {
-                code += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            return code;
-        }
-
-        function copyCode() {
-            const code = document.getElementById('generatedCode').textContent;
-            navigator.clipboard.writeText(code).then(() => {
-                showToast('Team code copied! 📋');
-            });
-        }
-
-        function showApp() {
-            document.getElementById('landingScreen').style.display = 'none';
-            document.getElementById('appContainer').style.display = 'flex';
-            document.getElementById('userBadge').textContent = `Welcome, ${appState.currentUser.name} ${appState.currentUser.avatar}`;
-            renderTab('home');
-        }
-
-        // Tab Navigation
-        function switchTab(tabName) {
-            appState.currentTab = tabName;
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-            renderTab(tabName);
-        }
-
-        function renderTab(tabName) {
-            let html = '';
-            switch(tabName) {
-                case 'home':
-                    html = renderHome();
-                    break;
-                case 'team':
-                    html = renderTeam();
-                    break;
-                case 'quiz':
-                    html = renderQuiz();
-                    break;
-                case 'league':
-                    html = renderLeague();
-                    break;
-                case 'badges':
-                    html = renderBadges();
-                    break;
-                case 'wrapped':
-                    html = renderWrapped();
-                    break;
-            }
-            document.getElementById('contentArea').innerHTML = html;
-            if (tabName === 'quiz') {
-                setTimeout(() => {
-                    document.querySelectorAll('.answer-option').forEach(el => {
-                        el.addEventListener('click', function() {
-                            document.querySelectorAll('.answer-option').forEach(e => e.classList.remove('selected'));
-                            this.classList.add('selected');
-                            playSound('ding');
-                        });
-                    });
-                    document.querySelectorAll('.powerup').forEach(el => {
-                        el.addEventListener('click', function() {
-                            if (!this.classList.contains('used')) {
-                                this.classList.add('used');
-                                playSound('whoosh');
-                                createConfetti();
-                            }
-                        });
-                    });
-                }, 100);
-            }
-            if (tabName === 'team') {
-                setTimeout(() => {
-                    const canvas = document.getElementById('qrCanvas');
-                    if (canvas) {
-                        generateQRCode(canvas, appState.currentTeam.code);
-                    }
-                }, 100);
-            }
-        }
-
-        function renderHome() {
-            return `
-                <div class="card" style="margin: 1rem;">
-                    <h2 style="color: var(--navy); margin-bottom: 1rem;">🎯 Quick Stats</h2>
-                    <div class="quick-stats">
-                        <div class="stat-box">
-                            <div class="stat-value">${appState.currentTeam.score}</div>
-                            <div class="stat-label">Team Score</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-value">${appState.currentTeam.members}</div>
-                            <div class="stat-label">Members</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-value">#1</div>
-                            <div class="stat-label">League Rank</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-value">5</div>
-                            <div class="stat-label">Badges</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="card" style="margin: 1rem;">
-                    <h2 style="color: var(--navy); margin-bottom: 1rem;">📅 Upcoming Quizzes</h2>
-                    <div style="padding: 1rem; background: rgba(44,148,194,0.1); border-radius: 10px; margin-bottom: 0.8rem;">
-                        <div style="font-weight: 600; color: var(--navy);">Tonight @ 8:00 PM</div>
-                        <div style="font-size: 0.9rem; color: #666; margin-top: 0.3rem;">The Steam Packet - Monday Trivia</div>
-                    </div>
-                    <div style="padding: 1rem; background: rgba(44,148,194,0.1); border-radius: 10px;">
-                        <div style="font-weight: 600; color: var(--navy);">Tomorrow @ 7:30 PM</div>
-                        <div style="font-size: 0.9rem; color: #666; margin-top: 0.3rem;">Fawkner Bar - Tuesday Challenge</div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderTeam() {
-            const team = appState.currentTeam;
-            const colorHex = colors[team.color] || colors.purple;
-            return `
-                <div class="card" style="margin: 1rem; border-left: 5px solid ${colorHex};">
-                    <div class="team-header">
-                        <div>
-                            <div class="team-name">${team.mascot} ${team.name}</div>
-                            <div class="team-motto">"${team.motto || 'Trivia Excellence'}"</div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 0.85rem; color: #666;">Team Code</div>
-                            <div style="font-size: 1.3rem; font-weight: 900; font-family: monospace; color: var(--purple);">${team.code}</div>
-                        </div>
-                    </div>
-                    <hr style="margin: 1rem 0; border: none; border-top: 1px solid rgba(44,148,194,0.2);">
-                    <div style="margin-bottom: 1.5rem;">
-                        <label class="input-label" style="margin-bottom: 0.8rem;">QR Code - Scan to Join Team</label>
-                        <div class="qr-container" onclick="showQRFullscreen()">
-                            <canvas id="qrCanvas" width="200" height="200" style="display: inline-block; border-radius: 12px; border: 3px solid var(--purple);"></canvas>
-                            <div class="qr-label">Tap to enlarge</div>
-                        </div>
-                    </div>
-                    ${appState.currentTeam.captain === appState.currentUser.name ? renderCaptainPanel(team) : ''}
-                    <div style="margin-top: 1.5rem;">
-                        <h3 style="color: var(--navy); margin-bottom: 1rem;">Team Members</h3>
-                        <div style="background: rgba(44,148,194,0.1); padding: 1rem; border-radius: 10px;">
-                            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
-                                <span style="font-size: 1.3rem;">🧠</span>
-                                <div>
-                                    <div style="font-weight: 600; color: var(--navy);">Alex (Captain)</div>
-                                    <div style="font-size: 0.85rem; color: #666;">Joined 2 weeks ago</div>
-                                </div>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem;">
-                                <span style="font-size: 1.3rem;">🦊</span>
-                                <div>
-                                    <div style="font-weight: 600; color: var(--navy);">Jordan</div>
-                                    <div style="font-size: 0.85rem; color: #666;">Joined 1 week ago</div>
-                                </div>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 0.8rem;">
-                                <span style="font-size: 1.3rem;">🐺</span>
-                                <div>
-                                    <div style="font-weight: 600; color: var(--navy);">Casey</div>
-                                    <div style="font-size: 0.85rem; color: #666;">Joined 3 days ago</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderCaptainPanel(team) {
-            return `
-                <div style="background: #F4F2EE; border: 1px solid #e8e5e0; padding: 1rem; border-radius: 10px; margin-bottom: 1rem;">
-                    <h3 style="color: var(--navy); margin-bottom: 1rem; font-family: 'VVDS Fifties', sans-serif;">👑 Captain Controls</h3>
-                    <div style="margin-bottom: 1rem;">
-                        <label class="input-label">Team Color</label>
-                        <div class="color-grid" style="margin: 0.5rem 0;">
-                            <div class="color-option purple" onclick="updateTeamColor('purple')"></div>
-                            <div class="color-option gold" onclick="updateTeamColor('gold')"></div>
-                            <div class="color-option red" onclick="updateTeamColor('red')"></div>
-                            <div class="color-option blue" onclick="updateTeamColor('blue')"></div>
-                            <div class="color-option green" onclick="updateTeamColor('green')"></div>
-                            <div class="color-option teal" onclick="updateTeamColor('teal')"></div>
-                            <div class="color-option pink" onclick="updateTeamColor('pink')"></div>
-                            <div class="color-option orange" onclick="updateTeamColor('orange')"></div>
-                        </div>
-                    </div>
-                    <div style="margin-bottom: 1rem;">
-                        <label class="input-label">Team Mascot</label>
-                        <div class="mascot-grid" style="margin: 0.5rem 0;">
-                            <div class="mascot-option" onclick="updateTeamMascot('🧠')">🧠</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🦊')">🦊</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🐺')">🐺</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🦁')">🦁</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🐉')">🐉</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🦅')">🦅</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🐙')">🐙</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🦈')">🦈</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🐝')">🐝</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🦄')">🦄</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🐻')">🐻</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🎯')">🎯</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🔥')">🔥</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('⚡')">⚡</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('🌟')">🌟</div>
-                            <div class="mascot-option" onclick="updateTeamMascot('💎')">💎</div>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="input-label">Team Motto (max 50 chars)</label>
-                        <input type="text" maxlength="50" value="${team.motto}" onchange="updateTeamMotto(this.value)">
-                    </div>
-                </div>
-            `;
-        }
-
-        function updateTeamColor(color) {
-            appState.currentTeam.color = color;
-            showToast(`Team color updated to ${color}! 🎨`);
-            renderTab('team');
-        }
-
-        function updateTeamMascot(mascot) {
-            appState.currentTeam.mascot = mascot;
-            showToast(`Team mascot updated! ${mascot}`);
-            renderTab('team');
-        }
-
-        function updateTeamMotto(motto) {
-            appState.currentTeam.motto = motto;
-            showToast('Team motto updated! ✍️');
-        }
-
-        function renderQuiz() {
-            const powerups = [
-                { emoji: '🔥', name: 'DOUBLE POINTS', desc: 'Double this question' },
-                { emoji: '5️⃣0️⃣', name: '50/50', desc: 'Remove 2 wrong answers' },
-                { emoji: '⏰', name: 'EXTRA TIME', desc: '+30 seconds' }
-            ];
-
-            return `
-                <div class="quiz-container">
-                    <div class="quiz-header">
-                        <div style="font-size: 0.9rem; opacity: 0.9;">Question 7 of 10</div>
-                        <div class="quiz-timer" id="quizTimer">45s</div>
-                        <div style="font-size: 0.9rem; opacity: 0.9;">Current Score: 420</div>
-                    </div>
-
-                    <div class="powerup-bar">
-                        ${powerups.map((p, i) => `
-                            <div class="powerup ${appState.powerupsUsed[i] ? 'used' : ''}" onclick="usePowerup(${i})">
-                                <span class="powerup-emoji">${p.emoji}</span>
-                                <div class="powerup-name">${p.name}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-
-                    <div class="quiz-question">
-                        <div class="question-text">What is the capital of France?</div>
-                        <div class="answer-option">Paris</div>
-                        <div class="answer-option">London</div>
-                        <div class="answer-option">Berlin</div>
-                        <div class="answer-option">Madrid</div>
-                    </div>
-
-                    <button class="btn btn-primary btn-block" style="margin: 1rem;">Submit Answer</button>
-                </div>
-            `;
-        }
-
-        function usePowerup(index) {
-            if (!appState.powerupsUsed[index]) {
-                appState.powerupsUsed[index] = true;
-                playSound('whoosh');
-                createConfetti();
-                showToast('Power-up activated! ⚡');
-                renderTab('quiz');
-            }
-        }
-
-        function renderLeague() {
-            return `
-                <div style="padding: 1rem;">
-                    <h2 style="color: var(--navy); margin-bottom: 1rem;">🏆 League Standings</h2>
-                    <div class="standings-header">
-                        <div style="text-align: center;">Rank</div>
-                        <div>Team</div>
-                        <div style="text-align: center;">Score</div>
-                        <div style="text-align: center;">Wins</div>
-                        <div style="text-align: center;">Games</div>
-                        <div style="text-align: center;">Accuracy</div>
-                    </div>
-                    ${mockLeagues.map(league => `
-                        <div class="standings-row">
-                            <div class="rank ${league.rank <= 3 ? 'gold' : ''}">#${league.rank}</div>
-                            <div>${league.team}</div>
-                            <div style="text-align: center; font-weight: 600; color: var(--purple);">${league.score}</div>
-                            <div style="text-align: center;">${league.wins}</div>
-                            <div style="text-align: center;">${league.played}</div>
-                            <div style="text-align: center;">${league.accuracy}</div>
-                        </div>
-                    `).join('')}
-                </div>
-
-                <div style="padding: 1rem;">
-                    <h2 style="color: var(--navy); margin-bottom: 1rem;">📍 Venue Map</h2>
-                    <div class="map-container">
-                        <svg viewBox="0 0 100 100" class="map-svg">
-                            <!-- Melbourne Outline -->
-                            <rect x="10" y="10" width="80" height="80" fill="#e0e7ff" stroke="#999" stroke-width="1"/>
-                            <!-- Venue Pins -->
-                            <g class="venue-pin" onclick="showVenuePopup(0)">
-                                <circle cx="35" cy="50" r="15" fill="#2C94C2" opacity="0.3"/>
-                                <circle cx="35" cy="50" r="6" fill="#2C94C2"/>
-                                <text x="35" y="35" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">Steam Packet</text>
-                            </g>
-                            <g class="venue-pin" onclick="showVenuePopup(1)">
-                                <circle cx="55" cy="45" r="15" fill="#ff3860" opacity="0.3"/>
-                                <circle cx="55" cy="45" r="6" fill="#ff3860"/>
-                                <text x="55" y="30" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">Fawkner</text>
-                            </g>
-                            <g class="venue-pin" onclick="showVenuePopup(2)">
-                                <circle cx="45" cy="65" r="15" fill="#00d084" opacity="0.3"/>
-                                <circle cx="45" cy="65" r="6" fill="#00d084"/>
-                                <text x="45" y="80" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">Sporting</text>
-                            </g>
-                            <g class="venue-pin" onclick="showVenuePopup(3)">
-                                <circle cx="70" cy="55" r="15" fill="#2C94C2" opacity="0.3"/>
-                                <circle cx="70" cy="55" r="6" fill="#2C94C2"/>
-                                <text x="70" y="40" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">Meat Wine</text>
-                            </g>
-                            <g class="venue-pin" onclick="showVenuePopup(4)">
-                                <circle cx="50" cy="35" r="15" fill="#E8A317" opacity="0.3"/>
-                                <circle cx="50" cy="35" r="6" fill="#E8A317"/>
-                                <text x="50" y="20" text-anchor="middle" font-size="8" font-weight="bold" fill="#333">Bar Americano</text>
-                            </g>
-                        </svg>
-                    </div>
-                </div>
-            `;
-        }
-
-        function showVenuePopup(index) {
-            const venue = venues[index];
-            const popup = document.getElementById('venuePopup');
-            popup.innerHTML = `
-                <div class="venue-name">${venue.name}</div>
-                <div class="venue-detail"><strong>Night:</strong> ${venue.day}</div>
-                <div class="venue-detail"><strong>Address:</strong> ${venue.address}</div>
-                <div class="venue-detail"><strong>Next Quiz:</strong> This ${venue.day}</div>
-                <button class="btn btn-primary btn-small btn-block" style="margin-top: 0.8rem;">Join Quiz</button>
-            `;
-            popup.style.display = 'block';
-            popup.style.left = '50%';
-            popup.style.top = '50%';
-            popup.style.transform = 'translate(-50%, -50%)';
-        }
-
-        function renderBadges() {
-            return `
-                <div style="padding: 1rem;">
-                    <h2 style="color: var(--navy); margin-bottom: 1rem;">🎖️ Your Badges</h2>
-                    <div class="badges-grid">
-                        ${mockBadges.map(badge => `
-                            <div class="badge-item ${!badge.earned ? 'badge-locked' : ''}">
-                                <div class="badge-emoji">${badge.emoji}</div>
-                                <div class="badge-name">${badge.name}</div>
-                                ${!badge.earned ? '<div style="font-size: 0.7rem; margin-top: 0.3rem; color: #999;">Locked</div>' : ''}
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderWrapped() {
-            return `
-                <div class="wrapped-container">
-                    <div class="wrapped-card gold-bg">
-                        <div class="wrapped-content">
-                            <div style="font-size: 2rem; margin-bottom: 1rem;">🎁</div>
-                            <h2 class="wrapped-title">KBT Wrapped 2024</h2>
-                            <div class="wrapped-label">Your trivia year in review</div>
-                        </div>
-                    </div>
-
-                    <div class="wrapped-card">
-                        <div class="wrapped-content">
-                            <div class="wrapped-label">Games Played</div>
-                            <div class="wrapped-stat">47</div>
-                            <div class="wrapped-subtitle">You never miss a night!</div>
-                            <button class="btn btn-gold btn-small" style="margin-top: 1rem;" onclick="shareWrappedStat('Games Played: 47 games - You never miss a night! 🎮')">📱 Share</button>
-                        </div>
-                    </div>
-
-                    <div class="wrapped-card">
-                        <div class="wrapped-content">
-                            <div class="wrapped-label">Correct Answers</div>
-                            <div class="wrapped-stat">412</div>
-                            <div class="wrapped-subtitle">MVP energy</div>
-                            <button class="btn btn-gold btn-small" style="margin-top: 1rem;" onclick="shareWrappedStat('Correct Answers: 412 - MVP energy! 🌟 #KnowBrainer')">📱 Share</button>
-                        </div>
-                    </div>
-
-                    <div class="wrapped-card gold-bg">
-                        <div class="wrapped-content">
-                            <div class="wrapped-label">Best Streak</div>
-                            <div class="wrapped-stat">21</div>
-                            <div class="wrapped-subtitle">Games won in a row - on fire! 🔥</div>
-                            <button class="btn btn-secondary btn-small" style="margin-top: 1rem;" onclick="shareWrappedStat('Best Streak: 21 games won in a row! On fire! 🔥 #KnowBrainer')">📱 Share</button>
-                        </div>
-                    </div>
-
-                    <div class="wrapped-card">
-                        <div class="wrapped-content">
-                            <div class="wrapped-label">Team Score</div>
-                            <div class="wrapped-stat">4,850</div>
-                            <div class="wrapped-subtitle">#1 in the league</div>
-                            <button class="btn btn-gold btn-small" style="margin-top: 1rem;" onclick="shareWrappedStat('The Know-It-Alls are #1 in the league with 4,850 points! 🏆 #KnowBrainer')">📱 Share</button>
-                        </div>
-                    </div>
-
-                    <div class="wrapped-card gold-bg">
-                        <div class="wrapped-content">
-                            <div class="wrapped-label">Your Accuracy</div>
-                            <div class="wrapped-stat">89%</div>
-                            <div class="wrapped-subtitle">Brain of the year material</div>
-                            <button class="btn btn-secondary btn-small" style="margin-top: 1rem;" onclick="shareWrappedStat('My accuracy: 89% - Brain of the year material! 🧠 #KnowBrainer')">📱 Share</button>
-                        </div>
-                    </div>
-
-                    <div class="wrapped-card">
-                        <div class="wrapped-content">
-                            <div style="font-size: 2.5rem; margin-bottom: 1rem;">🏆</div>
-                            <h3 class="wrapped-title">Season Champion</h3>
-                            <div class="wrapped-subtitle">The Know-It-Alls dominated 2024!</div>
-                            <button class="btn btn-gold btn-small" style="margin-top: 1.5rem;" onclick="shareWrapped()">📱 Share</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function shareWrapped() {
-            const text = `🏆 The Know-It-Alls are #1 in the KBT league! 47 games played, 412 correct answers, and 89% accuracy. Season Champion 2024! 🎉 #KnowBrainer`;
-            navigator.clipboard.writeText(text).then(() => {
-                showToast('Wrapped stats copied! Share on socials 📱');
-                playSound('ding');
-                createConfetti();
-            });
-        }
-
-        function shareWrappedStat(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                showToast('Copied to clipboard! 📋');
-                playSound('ding');
-            });
-        }
-
-        function openSettings() {
-            document.getElementById('settingsPanel').classList.add('active');
-        }
-
-        function closeSettings() {
-            document.getElementById('settingsPanel').classList.remove('active');
-        }
-
-        function updateDisplayName() {
-            const newName = document.getElementById('displayNameInput').value;
-            if (newName) {
-                appState.currentUser.name = newName;
-                document.getElementById('userBadge').textContent = `Welcome, ${newName} ${appState.currentUser.avatar}`;
-                showToast('Display name updated! ✨');
-                closeSettings();
-            }
-        }
-
-        function handleLogout() {
-            if (confirm('Log out from your team?')) {
-                document.getElementById('appContainer').style.display = 'none';
-                document.getElementById('landingScreen').style.display = 'flex';
-                appState.currentUser = null;
-                appState.currentTeam = null;
-                playSound('chime');
-            }
-        }
-
-        function handleDeleteAccount() {
-            if (confirm('Are you sure? This cannot be undone.')) {
-                if (confirm('Really delete your account and all progress?')) {
-                    document.getElementById('appContainer').style.display = 'none';
-                    document.getElementById('landingScreen').style.display = 'flex';
-                    appState.currentUser = null;
-                    appState.currentTeam = null;
-                    showToast('Account deleted. Goodbye! 👋');
-                }
-            }
-        }
-
-        function openAwards() {
-            appState.currentTab = 'awards';
-            document.getElementById('contentArea').innerHTML = renderAwardsTab();
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        }
-
-        function renderAwardsTab() {
-            let html = '<div style="padding: 1rem;"><h2 style="color: var(--navy); margin-bottom: 1.5rem;">🏆 Season Awards 2024</h2><div class="awards-container">';
-            seasonAwards.forEach((award, index) => {
-                html += `
-                    <div class="award-card" style="animation-delay: ${index * 0.1}s;">
-                        <div class="award-icon">${award.icon}</div>
-                        <div class="award-title">${award.title}</div>
-                        <div class="award-winner">🥇 ${award.winner}</div>
-                        <div class="award-stat">${award.stat}</div>
-                        <div class="award-comment">${award.comment}</div>
-                    </div>
-                `;
-            });
-            html += '</div></div>';
-            return html;
-        }
-
-        function createConfetti() {
-            for (let i = 0; i < 30; i++) {
-                const confetti = document.createElement('div');
-                confetti.className = 'confetti';
-                confetti.textContent = ['🎉', '🎊', '⭐', '✨', '🌟'][Math.floor(Math.random() * 5)];
-                confetti.style.left = Math.random() * 100 + '%';
-                confetti.style.top = '-10px';
-                confetti.style.fontSize = (Math.random() * 1 + 0.5) + 'rem';
-                confetti.style.animation = `fall ${Math.random() * 3 + 2}s linear forwards`;
-                document.body.appendChild(confetti);
-                setTimeout(() => confetti.remove(), 5000);
-            }
-        }
-
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes fall {
-                to {
-                    transform: translateY(100vh) rotate(360deg);
-                    opacity: 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
-
-        function showToast(message) {
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(() => {
-                toast.style.animation = 'slideOutDown 0.3s ease forwards';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        function showQRFullscreen() {
-            document.getElementById('qrFullscreen').classList.add('active');
-            generateQRCode(document.getElementById('qrFullscreenCanvas'), appState.currentTeam.code);
-        }
-
-        function closeQRFullscreen() {
-            document.getElementById('qrFullscreen').classList.remove('active');
-        }
-
-        function generateQRCode(canvas, text) {
-            const ctx = canvas.getContext('2d');
-            const size = canvas.width;
-            const moduleCount = 25;
-            const moduleSize = size / moduleCount;
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, size, size);
-
-            // Simple QR pattern
-            ctx.fillStyle = '#020817';
-            for (let i = 0; i < moduleCount; i++) {
-                for (let j = 0; j < moduleCount; j++) {
-                    if ((i < 7 && j < 7) ||
-                        (i < 7 && j >= moduleCount - 7) ||
-                        (i >= moduleCount - 7 && j < 7) ||
-                        (Math.random() > 0.5)) {
-                        ctx.fillRect(i * moduleSize, j * moduleSize, moduleSize, moduleSize);
-                    }
-                }
-            }
-        }
-    </script>
 </body>
 </html>
