@@ -1819,13 +1819,24 @@
             errorEl.style.display = 'none';
             inputEl.disabled = true;
             try {
-                const resp = await fetch(
+                // Check kbt_teams first (admin-registered), then trial_registrations (self-registered)
+                let t = null;
+                const r1 = await fetch(
                     KBT_SB_URL + '/kbt_teams?team_name=eq.' + encodeURIComponent(code) + '&limit=1',
                     { headers: KBT_SB_H }
                 );
-                const rows = resp.ok ? await resp.json() : [];
-                if (rows.length > 0) {
-                    const t = rows[0];
+                const rows1 = r1.ok ? await r1.json() : [];
+                if (rows1.length > 0) {
+                    t = { ...rows1[0], _source: 'kbt_teams' };
+                } else {
+                    const r2 = await fetch(
+                        KBT_SB_URL + '/trial_registrations?team_name=eq.' + encodeURIComponent(code) + '&limit=1',
+                        { headers: KBT_SB_H }
+                    );
+                    const rows2 = r2.ok ? await r2.json() : [];
+                    if (rows2.length > 0) t = { ...rows2[0], _source: 'trial_registrations' };
+                }
+                if (t) {
                     inputEl.disabled = false;
                     inputEl.style.borderColor = '';
                     appState.currentTeam = {
@@ -1905,7 +1916,7 @@
             selectedMascot = emoji;
         }
 
-        async async function completeRegistration() {
+        async function completeRegistration() {
             tempTeamData.color = selectedColor;
             tempTeamData.mascot = selectedMascot;
             tempTeamData.motto = document.getElementById('teamMotto').value || '';
@@ -1937,21 +1948,6 @@
             }
         }
 
-            // Write registration to Supabase
-            if (window.kbtData) {
-                try {
-                    await window.kbtData.registerTeam(
-                        window.kbtData.TARGET_EVENT_CODE,
-                        tempTeamData.name,
-                        tempTeamData.playerName,
-                        tempTeamData.color,
-                        tempTeamData.mascot
-                    );
-                    console.log('[kbt] Team registered in Supabase:', tempTeamData.name);
-                } catch(e) {
-                    console.warn('[kbt] Could not write registration to Supabase:', e.message);
-                }
-            }
         }
 
         function generateTeamCode() {
