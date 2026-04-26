@@ -1413,6 +1413,7 @@
         }
     </style>
     <script src="kbt-data.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -2520,6 +2521,46 @@
             init();
             loadTeamsFromSupabase();
         });
-    </script>
+    
+// Google Slides Export
+(function(){
+var CID="342815819710-sugohi5jr60hs2mfv1vgi4apfp3p2bjc.apps.googleusercontent.com",tc=null,tok=null;
+function gc(){if(tc)return tc;if(typeof google==="undefined"||!google.accounts){alert("GIS not loaded");return null;}tc=google.accounts.oauth2.initTokenClient({client_id:CID,scope:"https://www.googleapis.com/auth/presentations",callback:async function(r){var b=document.getElementById("btn-export-slides");if(r.error){alert("Sign-in failed: "+r.error);if(b){b.disabled=false;b.textContent="Export to Slides";}return;}tok=r.access_token;await ex();}});return tc;}
+window.exportLeaderboardToSlides=async function(){var b=document.getElementById("btn-export-slides");if(b){b.disabled=true;b.textContent="Exporting...";}var c=gc();if(!c){if(b){b.disabled=false;b.textContent="Export to Slides";}return;}if(tok){await ex();}else{c.requestAccessToken();}};
+async function api(m,u,body){var r=await fetch(u,{method:m,headers:{"Authorization":"Bearer "+tok,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});var d=await r.json();if(!r.ok)throw new Error(JSON.stringify(d));return d;}
+async function ex(){var b=document.getElementById("btn-export-slides");try{
+var code=(window._kbtHostEventCode)||(window.kbtData&&window.kbtData.TARGET_EVENT_CODE)||"KBT";
+var lb=await window.kbtData.getLeaderboard(code);
+if(!lb||!lb.length){alert("No scores yet.");if(b){b.disabled=false;b.textContent="Export to Slides";}return;}
+var ds=new Date().toLocaleDateString("en-AU",{day:"numeric",month:"long",year:"numeric"});
+var p=await api("POST","https://slides.googleapis.com/v1/presentations",{title:"KBT Results — "+ds});
+var pid=p.presentationId,s0=p.slides[0],els=s0.pageElements||[];
+var tEl=els.find(function(e){return e.shape&&e.shape.placeholder&&["CENTERED_TITLE","TITLE"].includes(e.shape.placeholder.type);});
+var sEl=els.find(function(e){return e.shape&&e.shape.placeholder&&e.shape.placeholder.type==="SUBTITLE";});
+var rqs=[];
+if(tEl){rqs.push({insertText:{objectId:tEl.objectId,text:"Know Brainer Trivia",insertionIndex:0}});rqs.push({updateTextStyle:{objectId:tEl.objectId,textRange:{type:"ALL"},style:{bold:true,fontSize:{magnitude:40,unit:"PT"},foregroundColor:{opaqueColor:{rgbColor:{red:1,green:1,blue:1}}}},fields:"bold,fontSize,foregroundColor"}});}
+if(sEl){rqs.push({insertText:{objectId:sEl.objectId,text:ds+" · "+code,insertionIndex:0}});rqs.push({updateTextStyle:{objectId:sEl.objectId,textRange:{type:"ALL"},style:{foregroundColor:{opaqueColor:{rgbColor:{red:.8,green:.8,blue:.9}}}},fields:"foregroundColor"}});}
+rqs.push({updatePageProperties:{objectId:s0.objectId,pageProperties:{pageBackgroundFill:{solidFill:{color:{rgbColor:{red:.07,green:.07,blue:.14}}}}},fields:"pageBackgroundFill"}});
+var lsId="slide_lb_kbt",lbId="lb_box_kbt";
+rqs.push({insertSlide:{insertionIndex:1,objectId:lsId,slideLayoutReference:{predefinedLayout:"BLANK"}}});
+rqs.push({updatePageProperties:{objectId:lsId,pageProperties:{pageBackgroundFill:{solidFill:{color:{rgbColor:{red:.07,green:.07,blue:.14}}}}},fields:"pageBackgroundFill"}});
+rqs.push({createShape:{objectId:lbId,shapeType:"TEXT_BOX",elementProperties:{pageObjectId:lsId,size:{height:{magnitude:310,unit:"PT"},width:{magnitude:620,unit:"PT"}},transform:{scaleX:1,scaleY:1,translateX:50,translateY:60,unit:"PT"}}}});
+var medals=["🥇","🥈","🥉"];
+var txt="🏆  Final Leaderboard
+
+"+lb.map(function(t,i){return(medals[i]||(i+1)+".")+(" "+t.team_name+" — "+t.total+" pts");}).join("
+");
+rqs.push({insertText:{objectId:lbId,text:txt,insertionIndex:0}});
+rqs.push({updateTextStyle:{objectId:lbId,textRange:{type:"FIXED_RANGE",startIndex:0,endIndex:20},style:{bold:true,fontSize:{magnitude:30,unit:"PT"},foregroundColor:{opaqueColor:{rgbColor:{red:1,green:.85,blue:.2}}}},fields:"bold,fontSize,foregroundColor"}});
+rqs.push({updateTextStyle:{objectId:lbId,textRange:{type:"FROM_START_INDEX",startIndex:22},style:{fontSize:{magnitude:22,unit:"PT"},foregroundColor:{opaqueColor:{rgbColor:{red:1,green:1,blue:1}}}},fields:"fontSize,foregroundColor"}});
+rqs.push({updateParagraphStyle:{objectId:lbId,textRange:{type:"ALL"},style:{lineSpacing:140},fields:"lineSpacing"}});
+await api("POST","https://slides.googleapis.com/v1/presentations/"+pid+":batchUpdate",{requests:rqs});
+window.open("https://docs.google.com/presentation/d/"+pid+"/edit","_blank");
+if(b){b.disabled=false;b.textContent="✅ Done";setTimeout(function(){b.textContent="Export to Slides";},4000);}
+}catch(e){console.error(e);alert("Export failed: "+e.message);if(b){b.disabled=false;b.textContent="Export to Slides";}}}
+})();
+</script>
+
+<div id="kbt-slides-fab" style="position:fixed;bottom:24px;right:24px;z-index:9999"><button id="btn-export-slides" onclick="exportLeaderboardToSlides()" style="background:#4285f4;color:#fff;border:none;border-radius:28px;padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.35)">&#128202; Export to Slides</button></div>
 </body>
 </html>
