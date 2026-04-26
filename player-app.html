@@ -2314,9 +2314,9 @@
                 submitted_at: new Date().toISOString()
             };
             try {
-                const r = await fetch(`${KBT_SB_URL}/answers`, {
+                const r = await fetch(`${KBT_SB_URL}/kbt_live_answers`, {
                     method: 'POST',
-                    headers: { ...KBT_SB_H, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+                    headers: { ...KBT_SB_H, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
                     body: JSON.stringify(payload)
                 });
                 if (status) status.innerHTML = r.ok
