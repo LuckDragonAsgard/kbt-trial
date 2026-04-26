@@ -5,7 +5,7 @@
 (function(){
   const SUPABASE_URL  = 'https://huvfgenbcaiicatvtxak.supabase.co';
   const REAL_ANON     = ['eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9','eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1dmZnZW5iY2FpaWNhdHZ0eGFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MTczNjIsImV4cCI6MjA5MTE5MzM2Mn0','uTgzTKYjJnkFlRUIhGfW4ODKyV24xOdKaX7lxpDuMfc'].join('.');
-  const TARGET_EVENT_CODE = 'TEST-NIGHT-001';
+  const TARGET_EVENT_CODE = 'TEST-001';
 
   const MODE_KEY = 'kbtDataMode';
   function getMode(){
