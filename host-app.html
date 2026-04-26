@@ -1420,10 +1420,10 @@
         <div class="host-login-card">
             <h1>Host Portal</h1>
             <div class="subtitle">Enter your host code to continue</div>
-            <input type="text" id="hostLoginCode" placeholder="HOST01" maxlength="10" autofocus>
+            <input type="text" id="hostLoginCode" placeholder="Event code e.g. TEST-001" maxlength="10" autofocus>
             <div class="host-login-error" id="hostLoginError"></div>
             <button onclick="hostLoginSubmit()">Enter</button>
-            <div class="host-login-hint">Valid codes for trial: HOST01, HOST02</div>
+            <div class="host-login-hint">Enter the event code for tonight's game</div>
         </div>
     </div>
     <div class="app active">
@@ -1818,7 +1818,7 @@
                 const team = teams.find(function(t){ return t.id === teamId; });
                 if (team) {
                     const roundNum = parseInt(round.replace('R', '')) || 1;
-                    window.kbtData.submitRoundScore(null, team.name, roundNum, teamScores[teamId][round])
+                    window.kbtData.submitRoundScore(window._kbtHostEventCode || null, team.name, roundNum, teamScores[teamId][round])
                         .catch(function(e){ console.warn('[kbt] score persist failed:', e.message); });
                 }
             }
@@ -1939,24 +1939,37 @@
 
         
 
-        function hostLoginSubmit() {
+        async function hostLoginSubmit() {
             const input = document.getElementById('hostLoginCode');
             const err = document.getElementById('hostLoginError');
+            const btn = document.querySelector('.host-login-card button');
             const code = (input.value || '').toUpperCase().trim();
-            const valid = ['HOST01', 'HOST02'];
-            if (valid.includes(code)) {
-                document.getElementById('hostLoginGate').classList.add('hidden');
-                const hostNameEl = document.getElementById('hostName');
-                if (hostNameEl) hostNameEl.textContent = code;
-                localStorage.setItem('kbtHostCode', code);
-                try {
-                    const saved = localStorage.getItem('teamScores');
-                    if (saved) teamScores = JSON.parse(saved);
-                } catch (e) {}
-            } else {
-                err.textContent = 'Invalid host code. Try HOST01 or HOST02.';
-                input.value = '';
-                input.focus();
+            if (!code) { err.textContent = 'Please enter an event code.'; return; }
+            err.textContent = '';
+            input.disabled = true;
+            if (btn) btn.disabled = true;
+            try {
+                const ev = await window.kbtData.getEventByCode(code);
+                if (ev) {
+                    window._kbtHostEventCode = ev.event_code;
+                    localStorage.setItem('kbtHostCode', ev.event_code);
+                    document.getElementById('hostLoginGate').classList.add('hidden');
+                    const hostNameEl = document.getElementById('hostName');
+                    if (hostNameEl) hostNameEl.textContent = ev.event_description || ev.event_code;
+                    try {
+                        const saved = localStorage.getItem('teamScores');
+                        if (saved) teamScores = JSON.parse(saved);
+                    } catch (e) {}
+                } else {
+                    err.textContent = 'Event code not found. Check with your KBT coordinator.';
+                    input.disabled = false;
+                    if (btn) btn.disabled = false;
+                    input.select();
+                }
+            } catch(e) {
+                err.textContent = 'Login failed — check connection and try again.';
+                input.disabled = false;
+                if (btn) btn.disabled = false;
             }
         }
 
@@ -1968,7 +1981,7 @@
                     if (e.key === 'Enter') hostLoginSubmit();
                 });
                 const saved = localStorage.getItem('kbtHostCode');
-                if (saved && ['HOST01','HOST02'].includes(saved)) {
+                if (saved) {
                     document.getElementById('hostLoginCode').value = saved;
                     hostLoginSubmit();
                 }
@@ -2410,7 +2423,7 @@
         async function loadLiveQuestions() {
             try {
                 if (!window.kbtData) { console.log('[kbt] data layer not loaded'); return; }
-                const code = window.kbtData.TARGET_EVENT_CODE;
+                const code = window._kbtHostEventCode || window.kbtData.TARGET_EVENT_CODE;
                 const ev = await window.kbtData.getEventByCode(code);
                 if (!ev) { console.log('[kbt] event not found:', code); return; }
                 const rows = await window.kbtData.getQuizItems(ev.id);
@@ -2466,7 +2479,7 @@
         async function loadTeamsFromSupabase() {
             if (!window.kbtData) return;
             try {
-                const code = window.kbtData.TARGET_EVENT_CODE;
+                const code = window._kbtHostEventCode || window.kbtData.TARGET_EVENT_CODE;
                 const ev = await window.kbtData.getEventByCode(code);
                 if (!ev) return;
                 const regs = await window.kbtData.getRegisteredTeams(ev.id);
