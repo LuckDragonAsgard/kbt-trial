@@ -891,19 +891,179 @@ async function loadStats(){
   if(qDraft>0)document.getElementById('draft-badge').textContent=qDraft;
 }
 
-// ââ LIVE SCORING âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+// ── LIVE SCORING ─────────────────────────────────────────────────────────────
+const KBT_WORKER = 'https://kbt-admin.pgallivan.workers.dev';
+
 async function loadLiveScoring(){
-  const ev=await db('/kbt_event?event_status=eq.active&order=id.desc&limit=5&select=id,event_date,event_code,event_description');
-  document.getElementById('ls-body').innerHTML=ev.length?`<table class="tbl">
-    <thead><tr><th>Date</th><th>Event</th><th>Status</th><th></th></tr></thead>
-    <tbody>${ev.map(e=>`<tr>
-      <td>${e.event_date?e.event_date.substring(0,10):'â'}</td>
-      <td>${e.event_code||e.event_description||'â'}</td>
-      <td><span class="badge bg">Active</span></td>
-      <td><button class="btn btn-blue btn-sm" onclick="alert('Live scoring UI coming soon!')">Score</button></td>
-    </tr>`).join('')}</tbody></table>`
-    :'<div class="empty">No active events. Events appear here when status = active.</div>';
+  loaded['live-scoring'] = false; // allow reload next visit
+  const ev = await db('/kbt_event?event_status=eq.active&order=id.desc&limit=10&select=id,event_date,event_code,event_description');
+  if (!ev.length) {
+    document.getElementById('ls-body').innerHTML = '<div class="empty">No active events. Set an event\'s status to "active" to score it.</div>';
+    return;
+  }
+  document.getElementById('ls-body').innerHTML = `<table class="tbl">
+    <thead><tr><th>Date</th><th>Event</th><th>Teams</th><th></th></tr></thead>
+    <tbody>${ev.map(e => `<tr id="ls-row-${e.id}">
+      <td>${e.event_date ? e.event_date.substring(0,10) : '—'}</td>
+      <td><strong>${e.event_code || '—'}</strong><br><span style="color:var(--muted);font-size:12px">${e.event_description || ''}</span></td>
+      <td id="ls-tc-${e.id}">—</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-blue btn-sm" onclick="openScoring(${e.id},'${e.event_code}')">📊 Score</button>
+        <button class="btn btn-sm" style="background:#6c5ce7;color:#fff;margin-left:4px" onclick="openQPush('${e.event_code}','${e.id}')">📡 Push Q</button>
+      </td>
+    </tr>
+    <tr id="ls-panel-${e.id}" style="display:none"><td colspan="4" id="ls-panel-body-${e.id}" style="padding:0"></td></tr>`).join('')}
+    </tbody></table>`;
+  for (const e of ev) {
+    db(`/kbt_teams?event_code=eq.${encodeURIComponent(e.event_code)}&select=id`).then(t => {
+      const el = document.getElementById(`ls-tc-${e.id}`);
+      if (el) el.textContent = t.length;
+    });
+  }
 }
+
+async function openScoring(eventId, eventCode) {
+  const panel = document.getElementById(`ls-panel-${eventId}`);
+  const body  = document.getElementById(`ls-panel-body-${eventId}`);
+  if (!panel || !body) return;
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  body.innerHTML = '<div class="loading" style="padding:16px"><span class="spinner"></span> Loading teams…</div>';
+  const [teams, scores] = await Promise.all([
+    db(`/kbt_teams?event_code=eq.${encodeURIComponent(eventCode)}&order=created_at.asc&select=id,display_name,team_name,team_emoji`),
+    db(`/trial_scores?event_code=eq.${encodeURIComponent(eventCode)}&select=team_name,round,points`)
+  ]);
+  const sm = {};
+  scores.forEach(s => { if (!sm[s.team_name]) sm[s.team_name]={}; sm[s.team_name][s.round]=s.points; });
+  const rounds = ['R1','R2','R3','Bonus'];
+  if (!teams.length) { body.innerHTML = '<div class="empty" style="padding:16px">No teams registered for this event.</div>'; return; }
+  body.innerHTML = `<div style="padding:12px">
+    <div style="font-weight:600;margin-bottom:10px">📊 Score Entry — ${eventCode}</div>
+    <table class="tbl" id="score-tbl-${eventId}">
+      <thead><tr><th>Team</th>${rounds.map(r=>`<th style="width:70px">${r}</th>`).join('')}<th>Total</th></tr></thead>
+      <tbody>${teams.map((t,i) => {
+        const tn = t.display_name || t.team_name || `Team ${i+1}`;
+        const total = rounds.reduce((s,r)=>s+(parseInt(sm[tn]?.[r])||0), 0);
+        return `<tr>
+          <td>${t.team_emoji||'🧠'} <strong>${tn}</strong></td>
+          ${rounds.map(r=>`<td><input type="number" min="0" max="999" class="score-inp"
+            style="width:60px;padding:4px;border:1px solid var(--border,#ddd);border-radius:4px;text-align:center"
+            data-team="${tn}" data-round="${r}" value="${sm[tn]?.[r]||''}"
+            oninput="lsUpdateTotal(this,${i},'${eventId}','${rounds.join(',')}')"></td>`).join('')}
+          <td id="ls-total-${eventId}-${i}" style="font-weight:600;color:var(--blue)">${total||'—'}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+      <button class="btn btn-blue" onclick="saveAllScores('${eventId}','${eventCode}')">💾 Save All Scores</button>
+      <span id="ls-save-msg-${eventId}" style="font-size:13px;color:var(--green,#00c875)"></span>
+    </div>
+  </div>`;
+}
+
+function lsUpdateTotal(inp, rowIdx, eventId, roundsStr) {
+  const rounds = roundsStr.split(',');
+  const row = inp.closest('tr');
+  let total = 0;
+  row.querySelectorAll('.score-inp').forEach(i => total += (parseInt(i.value)||0));
+  const el = document.getElementById(`ls-total-${eventId}-${rowIdx}`);
+  if (el) el.textContent = total || '—';
+}
+
+async function saveAllScores(eventId, eventCode) {
+  const msg = document.getElementById(`ls-save-msg-${eventId}`);
+  if (msg) msg.textContent = 'Saving…';
+  const inputs = document.querySelectorAll(`#score-tbl-${eventId} .score-inp`);
+  const upserts = [];
+  inputs.forEach(inp => {
+    if (inp.value === '') return;
+    upserts.push({ event_code: eventCode, team_name: inp.dataset.team, round: inp.dataset.round, points: parseInt(inp.value)||0 });
+  });
+  if (!upserts.length) { if (msg) msg.textContent = 'Nothing to save.'; return; }
+  const r = await fetch(`${SB}/trial_scores`, {
+    method: 'POST',
+    headers: { ...H, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify(upserts)
+  });
+  if (msg) msg.textContent = r.ok ? '✓ Saved!' : `Error ${r.status}`;
+  setTimeout(() => { if (msg) msg.textContent = ''; }, 3000);
+}
+
+async function openQPush(eventCode, eventId) {
+  const panel = document.getElementById(`ls-panel-${eventId}`);
+  const body  = document.getElementById(`ls-panel-body-${eventId}`);
+  if (!panel || !body) return;
+  if (panel.style.display !== 'none' && body.querySelector('#qp-q-'+eventId)) { panel.style.display='none'; return; }
+  panel.style.display = '';
+  body.innerHTML = '<div class="loading" style="padding:16px"><span class="spinner"></span> Loading…</div>';
+  let q = {};
+  try {
+    const r = await fetch(`${KBT_WORKER}/api/question?event_code=${encodeURIComponent(eventCode)}`);
+    if (r.ok) q = await r.json();
+  } catch(e) {}
+  body.innerHTML = `<div style="padding:12px">
+    <div style="font-weight:600;margin-bottom:10px">📡 Push Question — ${eventCode}</div>
+    <div style="display:grid;gap:8px">
+      <input id="qp-q-${eventId}" class="form-input" placeholder="Question text" value="${(q.question||'').replace(/"/g,'&quot;')}" style="width:100%">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input id="qp-a-${eventId}" class="form-input" placeholder="Option A" value="${(q.optionA||'').replace(/"/g,'&quot;')}">
+        <input id="qp-b-${eventId}" class="form-input" placeholder="Option B" value="${(q.optionB||'').replace(/"/g,'&quot;')}">
+        <input id="qp-c-${eventId}" class="form-input" placeholder="Option C" value="${(q.optionC||'').replace(/"/g,'&quot;')}">
+        <input id="qp-d-${eventId}" class="form-input" placeholder="Option D" value="${(q.optionD||'').replace(/"/g,'&quot;')}">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:13px">Q#</label>
+        <input id="qp-n-${eventId}" type="number" min="1" class="form-input" style="width:60px" value="${q.questionNum||1}">
+        <label style="font-size:13px">Round</label>
+        <input id="qp-r-${eventId}" class="form-input" style="width:80px" placeholder="R1" value="${q.round||''}">
+        <label style="font-size:13px">Secs</label>
+        <input id="qp-t-${eventId}" type="number" min="10" max="120" class="form-input" style="width:70px" value="${q.timeLimit||60}">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-blue" onclick="pushQuestion('${eventCode}','${eventId}')">📡 Push Live</button>
+        <button class="btn" style="background:#e74c3c;color:#fff" onclick="clearQuestion('${eventCode}','${eventId}')">🗑 Clear</button>
+        <span id="qp-msg-${eventId}" style="font-size:13px;align-self:center;color:var(--green,#00c875)"></span>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function pushQuestion(eventCode, eventId) {
+  const msg = document.getElementById(`qp-msg-${eventId}`);
+  if (msg) msg.textContent = 'Pushing…';
+  const payload = {
+    event_code: eventCode,
+    question:    document.getElementById(`qp-q-${eventId}`)?.value?.trim() || '',
+    optionA:     document.getElementById(`qp-a-${eventId}`)?.value?.trim() || '',
+    optionB:     document.getElementById(`qp-b-${eventId}`)?.value?.trim() || '',
+    optionC:     document.getElementById(`qp-c-${eventId}`)?.value?.trim() || '',
+    optionD:     document.getElementById(`qp-d-${eventId}`)?.value?.trim() || '',
+    questionNum: parseInt(document.getElementById(`qp-n-${eventId}`)?.value) || 1,
+    round:       document.getElementById(`qp-r-${eventId}`)?.value?.trim() || '',
+    timeLimit:   parseInt(document.getElementById(`qp-t-${eventId}`)?.value) || 60,
+    pushedAt:    new Date().toISOString()
+  };
+  if (!payload.question) { if (msg) msg.textContent = 'Enter a question first'; return; }
+  try {
+    const r = await fetch(`${KBT_WORKER}/api/question`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    if (msg) msg.textContent = r.ok ? '✓ Live! Players can see this.' : `Error ${r.status}`;
+  } catch(e) { if (msg) msg.textContent = 'Network error'; }
+  setTimeout(() => { if (msg) msg.textContent = ''; }, 4000);
+}
+
+async function clearQuestion(eventCode, eventId) {
+  const msg = document.getElementById(`qp-msg-${eventId}`);
+  if (msg) msg.textContent = 'Clearing…';
+  try {
+    const r = await fetch(`${KBT_WORKER}/api/question?event_code=${encodeURIComponent(eventCode)}`, {method:'DELETE'});
+    if (msg) msg.textContent = r.ok ? '✓ Question cleared.' : `Error ${r.status}`;
+  } catch(e) { if (msg) msg.textContent = 'Network error'; }
+  setTimeout(() => { if (msg) msg.textContent = ''; }, 3000);
+}
+
 
 // ââ QUESTION REVIEW âââââââââââââââââââââââââââââââââââââââââââââââââ
 let qrOff=0,qrTimer;const QR_LIM=25;
